@@ -12,6 +12,7 @@ export default function Dashboard() {
   });
   const [tables, setTables] = useState<any[]>([]);
   const [recentOrders, setRecentOrders] = useState<any[]>([]);
+  const [categories, setCategories] = useState<any[]>([]);
 
   const fetchStats = async () => {
     try {
@@ -75,10 +76,25 @@ export default function Dashboard() {
     }
   };
 
+  const fetchCategories = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('categories')
+        .select('*')
+        .order('name');
+      
+      if (error) throw error;
+      setCategories(data || []);
+    } catch (error) {
+      console.error('Error fetching categories:', error);
+    }
+  };
+
   useEffect(() => {
     fetchStats();
     fetchRecentOrders();
     fetchTables();
+    fetchCategories();
 
     // Realtime subscriptions
     const ordersChannel = supabase
@@ -96,9 +112,17 @@ export default function Dashboard() {
       })
       .subscribe();
 
+    const categoriesChannel = supabase
+      .channel('dashboard-categories')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'categories' }, () => {
+        fetchCategories();
+      })
+      .subscribe();
+
     return () => {
       supabase.removeChannel(ordersChannel);
       supabase.removeChannel(tablesChannel);
+      supabase.removeChannel(categoriesChannel);
     };
   }, []);
 
@@ -139,21 +163,52 @@ export default function Dashboard() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        <div className={`lg:col-span-2 bg-${themeConfig.colors.surface} p-6 rounded-2xl shadow-sm border border-slate-100`}>
-          <h3 className={`text-lg font-bold text-${themeConfig.colors.text} mb-6`}>Vendas da Semana</h3>
-          <div className="h-80">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={data}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
-                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#64748b' }} dy={10} />
-                <YAxis axisLine={false} tickLine={false} tick={{ fill: '#64748b' }} dx={-10} />
-                <Tooltip 
-                  cursor={{ fill: '#f1f5f9' }}
-                  contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
-                />
-                <Bar dataKey="vendas" fill="#059669" radius={[4, 4, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
+        <div className={`lg:col-span-2 space-y-8`}>
+          <div className={`bg-${themeConfig.colors.surface} p-6 rounded-2xl shadow-sm border border-slate-100`}>
+            <h3 className={`text-lg font-bold text-${themeConfig.colors.text} mb-6`}>Vendas da Semana</h3>
+            <div className="h-80">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={data}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+                  <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#64748b' }} dy={10} />
+                  <YAxis axisLine={false} tickLine={false} tick={{ fill: '#64748b' }} dx={-10} />
+                  <Tooltip 
+                    cursor={{ fill: '#f1f5f9' }}
+                    contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                  />
+                  <Bar dataKey="vendas" fill="#059669" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+
+          <div>
+            <h3 className={`text-lg font-bold text-${themeConfig.colors.text} mb-4`}>Categorias</h3>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              {categories.map((cat) => (
+                <div 
+                  key={cat.id} 
+                  className={`relative overflow-hidden h-24 rounded-xl shadow-sm border border-slate-200 group`}
+                >
+                  {cat.image ? (
+                    <img 
+                      src={cat.image} 
+                      alt={cat.name} 
+                      className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+                      referrerPolicy="no-referrer"
+                    />
+                  ) : (
+                    <div className={`absolute inset-0 bg-${themeConfig.colors.surface} flex items-center justify-center`}>
+                      <ShoppingBag size={24} className={`text-${themeConfig.colors.primary}/20`} />
+                    </div>
+                  )}
+                  
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent flex items-end p-3">
+                    <h3 className="text-white font-bold text-sm">{cat.name}</h3>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
 
