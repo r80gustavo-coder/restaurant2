@@ -57,9 +57,28 @@ export default function Menu() {
       })
       .subscribe();
 
+    const tablesChannel = supabase
+      .channel('menu-table-status')
+      .on(
+        'postgres_changes', 
+        { event: 'UPDATE', schema: 'public', table: 'tables', filter: `id=eq.${tableId}` }, 
+        (payload) => {
+          const newTable = payload.new as any;
+          if (newTable.status === 'livre') {
+            // Table was freed (checkout completed), log out user
+            localStorage.removeItem('tableId');
+            localStorage.removeItem('tableCode');
+            localStorage.removeItem('cart');
+            navigate('/login');
+          }
+        }
+      )
+      .subscribe();
+
     return () => {
       supabase.removeChannel(productsChannel);
       supabase.removeChannel(categoriesChannel);
+      supabase.removeChannel(tablesChannel);
     };
   }, [navigate]);
 
@@ -253,8 +272,11 @@ export default function Menu() {
               animate={{ y: 0 }}
               exit={{ y: "100%" }}
               transition={{ type: "spring", damping: 25, stiffness: 300 }}
-              className="bg-white rounded-t-[2.5rem] p-8 pb-10 max-h-[90vh] overflow-y-auto w-full max-w-md mx-auto relative shadow-2xl"
+              className="bg-white rounded-t-[2.5rem] p-6 pb-12 max-h-[85vh] overflow-y-auto w-full max-w-md mx-auto relative shadow-2xl flex flex-col"
+              onClick={(e) => e.stopPropagation()}
             >
+              <div className="absolute top-4 left-1/2 -translate-x-1/2 w-12 h-1.5 bg-slate-200 rounded-full mb-4" />
+              
               <button 
                 onClick={() => setSelectedProduct(null)}
                 className="absolute top-6 right-6 p-2 bg-slate-100 text-slate-500 rounded-full hover:bg-slate-200 transition-colors z-10"
@@ -262,60 +284,64 @@ export default function Menu() {
                 <X size={24} />
               </button>
 
-              {selectedProduct.image && (
-                <div className="rounded-3xl overflow-hidden mb-8 shadow-lg">
-                  <img src={selectedProduct.image} alt={selectedProduct.name} className="w-full h-64 object-cover" referrerPolicy="no-referrer" />
-                </div>
-              )}
-              
-              <h2 className={`text-3xl font-black text-${themeConfig.colors.text} mb-3 leading-tight`}>{selectedProduct.name}</h2>
-              <p className={`text-${themeConfig.colors.textMuted} mb-6 leading-relaxed text-lg`}>{selectedProduct.description}</p>
-              
-              {selectedProduct.type === 'composed' && selectedProduct.ingredients && selectedProduct.ingredients.length > 0 && (
-                <div className="mb-8 bg-slate-50 p-5 rounded-2xl border border-slate-100">
-                  <h4 className={`text-xs font-bold text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-2`}>
-                    <UtensilsCrossed size={14} /> Ingredientes
-                  </h4>
-                  <p className={`text-base text-${themeConfig.colors.text} font-medium leading-relaxed`}>
-                    {selectedProduct.ingredients.map((i: any) => i.name).join(', ')}
-                  </p>
-                </div>
-              )}
+              <div className="flex-1 overflow-y-auto -mx-6 px-6">
+                {selectedProduct.image && (
+                  <div className="rounded-3xl overflow-hidden mb-6 shadow-lg mt-8">
+                    <img src={selectedProduct.image} alt={selectedProduct.name} className="w-full h-56 object-cover" referrerPolicy="no-referrer" />
+                  </div>
+                )}
+                
+                <h2 className={`text-2xl font-black text-${themeConfig.colors.text} mb-2 leading-tight`}>{selectedProduct.name}</h2>
+                <p className={`text-${themeConfig.colors.textMuted} mb-6 leading-relaxed`}>{selectedProduct.description}</p>
+                
+                {selectedProduct.type === 'composed' && selectedProduct.ingredients && selectedProduct.ingredients.length > 0 && (
+                  <div className="mb-6 bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                    <h4 className={`text-xs font-bold text-slate-400 uppercase tracking-widest mb-2 flex items-center gap-2`}>
+                      <UtensilsCrossed size={14} /> Ingredientes
+                    </h4>
+                    <p className={`text-sm text-${themeConfig.colors.text} font-medium leading-relaxed`}>
+                      {selectedProduct.ingredients.map((i: any) => i.name).join(', ')}
+                    </p>
+                  </div>
+                )}
 
-              <div className="mb-8">
-                <label className={`block text-sm font-bold text-${themeConfig.colors.text} mb-3 ml-1`}>Alguma observação?</label>
-                <textarea
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                  placeholder="Ex: Tirar cebola, ponto da carne..."
-                  className="w-full p-4 rounded-2xl bg-slate-50 border border-slate-200 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 resize-none font-medium placeholder:text-slate-400 transition-all"
-                  rows={3}
-                />
+                <div className="mb-6">
+                  <label className={`block text-sm font-bold text-${themeConfig.colors.text} mb-2 ml-1`}>Alguma observação?</label>
+                  <textarea
+                    value={notes}
+                    onChange={(e) => setNotes(e.target.value)}
+                    placeholder="Ex: Tirar cebola, ponto da carne..."
+                    className="w-full p-4 rounded-2xl bg-slate-50 border border-slate-200 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 resize-none font-medium placeholder:text-slate-400 transition-all"
+                    rows={3}
+                  />
+                </div>
               </div>
 
-              <div className="flex items-center justify-between mb-8 bg-slate-50 p-2 rounded-2xl border border-slate-100">
+              <div className="mt-4 pt-4 border-t border-slate-100 bg-white">
+                <div className="flex items-center justify-between mb-4 bg-slate-50 p-2 rounded-2xl border border-slate-100">
+                  <button 
+                    onClick={() => setQuantity(Math.max(1, quantity - 1))}
+                    className="w-12 h-12 flex items-center justify-center bg-white text-slate-600 rounded-xl shadow-sm border border-slate-200 active:scale-95 transition-transform hover:bg-slate-50"
+                  >
+                    <Minus size={20} />
+                  </button>
+                  <span className={`text-2xl font-black text-${themeConfig.colors.text} w-16 text-center`}>{quantity}</span>
+                  <button 
+                    onClick={() => setQuantity(quantity + 1)}
+                    className={`w-12 h-12 flex items-center justify-center bg-${themeConfig.colors.primary} text-white rounded-xl shadow-sm active:scale-95 transition-transform hover:bg-${themeConfig.colors.primaryHover}`}
+                  >
+                    <Plus size={20} />
+                  </button>
+                </div>
+
                 <button 
-                  onClick={() => setQuantity(Math.max(1, quantity - 1))}
-                  className="w-14 h-14 flex items-center justify-center bg-white text-slate-600 rounded-xl shadow-sm border border-slate-200 active:scale-95 transition-transform hover:bg-slate-50"
+                  onClick={addToCart}
+                  className={`w-full py-4 bg-${themeConfig.colors.primary} text-white font-black text-lg rounded-2xl flex items-center justify-between px-6 shadow-xl shadow-${themeConfig.colors.primary}/30 active:scale-[0.98] transition-all hover:translate-y-[-2px]`}
                 >
-                  <Minus size={24} />
-                </button>
-                <span className={`text-3xl font-black text-${themeConfig.colors.text} w-20 text-center`}>{quantity}</span>
-                <button 
-                  onClick={() => setQuantity(quantity + 1)}
-                  className={`w-14 h-14 flex items-center justify-center bg-${themeConfig.colors.primary} text-white rounded-xl shadow-sm active:scale-95 transition-transform hover:bg-${themeConfig.colors.primaryHover}`}
-                >
-                  <Plus size={24} />
+                  <span className="flex items-center gap-2"><ShoppingBag size={20} /> Adicionar</span>
+                  <span>{themeConfig.currency} {(selectedProduct.price * quantity).toFixed(2)}</span>
                 </button>
               </div>
-
-              <button 
-                onClick={addToCart}
-                className={`w-full py-5 bg-${themeConfig.colors.primary} text-white font-black text-xl rounded-2xl flex items-center justify-between px-8 shadow-xl shadow-${themeConfig.colors.primary}/30 active:scale-[0.98] transition-all hover:translate-y-[-2px]`}
-              >
-                <span className="flex items-center gap-3"><ShoppingBag size={24} /> Adicionar</span>
-                <span>{themeConfig.currency} {(selectedProduct.price * quantity).toFixed(2)}</span>
-              </button>
             </motion.div>
           </motion.div>
         )}

@@ -108,6 +108,21 @@ export default function AdminLayout() {
     setNotifications(prev => prev.map(n => ({ ...n, read: true })));
   };
 
+  const testNotification = () => {
+    const newNotification = {
+      id: Date.now(),
+      title: 'Teste de Notificação',
+      message: 'Esta é uma notificação de teste para verificar o som.',
+      time: new Date(),
+      type: 'info',
+      read: false
+    };
+    setNotifications(prev => [newNotification, ...prev]);
+    if (audioRef.current) {
+      audioRef.current.play().catch(e => console.error('Error playing sound:', e));
+    }
+  };
+
   return (
     <div className={`min-h-screen bg-${themeConfig.colors.background} flex`}>
       {/* Sidebar */}
@@ -157,7 +172,14 @@ export default function AdminLayout() {
             {navItems.find(i => i.path === location.pathname)?.label || 'Admin'}
           </h2>
           
-          <div className="relative">
+          <div className="relative flex items-center gap-4">
+            <button 
+              onClick={testNotification}
+              className="px-3 py-1 text-xs font-medium text-slate-500 hover:bg-slate-100 rounded-lg border border-slate-200"
+            >
+              Testar Som
+            </button>
+
             <button 
               onClick={() => {
                 setShowNotifications(!showNotifications);
