@@ -19,12 +19,34 @@ export default function OrderStatus({ socket }: { socket: Socket | null }) {
     try {
       const { data, error } = await supabase
         .from('orders')
-        .select('*')
+        .select(`
+          *,
+          items:order_items (
+            id,
+            quantity,
+            notes,
+            product:products (
+              name,
+              price
+            )
+          )
+        `)
         .eq('tableId', parseInt(tableId))
         .order('createdAt', { ascending: false });
 
       if (error) throw error;
-      setOrders(data || []);
+
+      // Transformar os dados para o formato esperado pela UI
+      const formattedOrders = data?.map(order => ({
+        ...order,
+        items: order.items.map((item: any) => ({
+          ...item,
+          name: item.product?.name,
+          price: item.product?.price
+        }))
+      }));
+
+      setOrders(formattedOrders || []);
     } catch (error) {
       console.error('Error fetching orders:', error);
     }

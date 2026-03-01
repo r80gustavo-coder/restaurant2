@@ -35,33 +35,42 @@ export default function Cart({ socket }: { socket: Socket | null }) {
     const tableId = localStorage.getItem('tableId');
     
     try {
-      // 1. Criar o pedido
+      // 1. Criar o pedido na tabela 'orders'
       const { data: order, error: orderError } = await supabase
         .from('orders')
         .insert([{
           tableId: parseInt(tableId!),
           status: 'pending',
-          total: total,
-          items: cart.map(item => ({
-            productId: item.id,
-            name: item.name,
-            price: item.price,
-            quantity: item.quantity,
-            notes: item.notes
-          }))
+          total: total
         }])
         .select()
         .single();
 
       if (orderError) throw orderError;
 
-      // 2. Atualizar status da mesa para ocupada
+      if (!order) throw new Error('Erro ao criar pedido');
+
+      // 2. Inserir os itens na tabela 'order_items'
+      const orderItems = cart.map(item => ({
+        orderId: order.id,
+        productId: item.id,
+        quantity: item.quantity,
+        notes: item.notes
+      }));
+
+      const { error: itemsError } = await supabase
+        .from('order_items')
+        .insert(orderItems);
+
+      if (itemsError) throw itemsError;
+
+      // 3. Atualizar status da mesa para ocupada
       await supabase
         .from('tables')
         .update({ status: 'ocupada' })
         .eq('id', parseInt(tableId!));
 
-      // 3. Limpar carrinho e redirecionar
+      // 4. Limpar carrinho e redirecionar
       localStorage.removeItem('cart');
       setCart([]);
       navigate('/status');
