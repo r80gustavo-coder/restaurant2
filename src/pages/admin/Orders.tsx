@@ -69,16 +69,27 @@ export default function Orders() {
   }, []);
 
   const updateStatus = async (id: number, status: string) => {
+    // Optimistic update
+    setOrders(currentOrders => 
+      currentOrders.map(order => 
+        order.id === id ? { ...order, status } : order
+      )
+    );
+
     try {
       const { error } = await supabase
         .from('orders')
         .update({ status })
         .eq('id', id);
 
-      if (error) throw error;
-      // O realtime irá atualizar a lista
+      if (error) {
+        throw error;
+      }
     } catch (error) {
       console.error('Error updating status:', error);
+      // Revert changes by fetching original data
+      fetchOrders();
+      alert('Erro ao atualizar status do pedido');
     }
   };
 

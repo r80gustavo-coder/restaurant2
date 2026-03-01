@@ -24,6 +24,7 @@ export default function AdminLayout() {
     const channel = supabase
       .channel('admin-notifications')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, async (payload) => {
+        console.log('Notification payload:', payload);
         const order = payload.new as any;
         const oldOrder = payload.old as any;
         let title = '';
@@ -36,7 +37,14 @@ export default function AdminLayout() {
           message = `Mesa ${tableNum} - ${themeConfig.currency} ${order.total.toFixed(2)}`;
           type = 'success';
         } else if (payload.eventType === 'UPDATE') {
-          if (order.status !== oldOrder.status) {
+          // Check if status changed. 
+          // Note: oldOrder might only contain ID depending on replica identity.
+          // If oldOrder.status is undefined, we assume it's a status update if the new status is different from what we might expect, 
+          // but safer to just check if we have both.
+          // If we can't verify change, we might skip or just notify.
+          // For now, let's assume if status is present in new payload, it's relevant.
+          
+          if (order.status && oldOrder && order.status !== oldOrder.status) {
             const tableNum = await fetchTableNumber(order.tableId);
             title = 'Atualização de Pedido';
             const statusMap: Record<string, string> = {
@@ -66,11 +74,17 @@ export default function AdminLayout() {
           
           // Play sound
           if (audioRef.current) {
-            audioRef.current.play().catch(e => console.error('Error playing sound:', e));
+            try {
+              await audioRef.current.play();
+            } catch (e) {
+              console.error('Error playing sound (user interaction needed?):', e);
+            }
           }
         }
       })
-      .subscribe();
+      .subscribe((status) => {
+        console.log('Notification subscription status:', status);
+      });
 
     return () => {
       supabase.removeChannel(channel);
