@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { themeConfig } from '../../config/theme';
 import { Lock, ArrowRight } from 'lucide-react';
+import { supabase } from '../../lib/supabase';
 
 export default function TableLogin() {
   const navigate = useNavigate();
@@ -13,16 +14,24 @@ export default function TableLogin() {
   const [fetchingTables, setFetchingTables] = useState(true);
 
   useEffect(() => {
-    fetch('/api/tables')
-      .then(res => res.json())
-      .then(data => {
-        setTables(data);
-        setFetchingTables(false);
-      })
-      .catch(err => {
+    const fetchTables = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('tables')
+          .select('*')
+          .eq('active', true)
+          .order('number', { ascending: true });
+
+        if (error) throw error;
+        setTables(data || []);
+      } catch (err) {
         console.error('Error fetching tables:', err);
+      } finally {
         setFetchingTables(false);
-      });
+      }
+    };
+
+    fetchTables();
   }, []);
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -36,29 +45,30 @@ export default function TableLogin() {
     setError('');
     
     try {
-      const res = await fetch('/api/tables/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          tableId: parseInt(selectedTableId), 
-          loginCode: code.toUpperCase() 
-        })
-      });
-      
-      let data;
-      try {
-        data = await res.json();
-      } catch (parseErr) {
-        throw new Error(`Resposta inválida do servidor (Status: ${res.status})`);
+      // Verificar código da mesa diretamente no Supabase
+      const { data: table, error } = await supabase
+        .from('tables')
+        .select('*')
+        .eq('id', parseInt(selectedTableId))
+        .single();
+
+      if (error || !table) {
+        throw new Error('Mesa não encontrada');
+      }
+
+      if (!table.active) {
+        throw new Error('Esta mesa está inativa');
+      }
+
+      if (table.loginCode !== code.toUpperCase()) {
+        throw new Error('Senha incorreta');
       }
       
-      if (res.ok && data.success) {
-        localStorage.setItem('tableId', data.table.id.toString());
-        localStorage.setItem('tableNumber', data.table.number.toString());
-        navigate('/');
-      } else {
-        setError(data.message || 'Senha inválida');
-      }
+      // Login bem-sucedido
+      localStorage.setItem('tableId', table.id.toString());
+      localStorage.setItem('tableNumber', table.number.toString());
+      navigate('/menu'); // Redirecionar para o menu (rota correta do cliente)
+      
     } catch (err: any) {
       console.error('Login error:', err);
       setError(err.message || 'Erro ao conectar com o servidor');
