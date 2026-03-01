@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Socket } from 'socket.io-client';
 import { themeConfig } from '../../config/theme';
 import { Plus, Trash2, Edit2, Image as ImageIcon, PlusCircle } from 'lucide-react';
+import { supabase } from '../../lib/supabase';
 
 export default function Products({ socket }: { socket: Socket | null }) {
   const [products, setProducts] = useState<any[]>([]);
@@ -23,71 +24,126 @@ export default function Products({ socket }: { socket: Socket | null }) {
   });
 
   const fetchData = async () => {
-    const [prodRes, catRes, invRes] = await Promise.all([
-      fetch('/api/products'),
-      fetch('/api/categories'),
-      fetch('/api/inventory')
-    ]);
-    const prodData = await prodRes.json();
-    const catData = await catRes.json();
-    const invData = await invRes.json();
-    
-    setProducts(prodData);
-    setCategories(catData);
-    setInventoryItems(invData);
-    
-    if (catData.length > 0 && !formData.categoryId) {
-      setFormData(prev => ({ ...prev, categoryId: catData[0].id.toString() }));
+    try {
+      const [prodRes, catRes, invRes] = await Promise.all([
+        supabase.from('products').select(`
+          *,
+          ingredients:product_ingredients (
+            id,
+            inventoryItemId,
+            quantity,
+            inventory_item:inventory_items (
+              name,
+              unit
+            )
+          )
+        `).order('name'),
+        supabase.from('categories').select('*').order('name'),
+        supabase.from('inventory_items').select('*').order('name')
+      ]);
+
+      if (prodRes.error) throw prodRes.error;
+      if (catRes.error) throw catRes.error;
+      if (invRes.error) throw invRes.error;
+      
+      // Transform products to include flattened ingredients for easier UI handling
+      const formattedProducts = prodRes.data?.map(p => ({
+        ...p,
+        ingredients: p.ingredients?.map((i: any) => ({
+          ...i,
+          name: i.inventory_item?.name,
+          unit: i.inventory_item?.unit
+        }))
+      })) || [];
+
+      setProducts(formattedProducts);
+      setCategories(catRes.data || []);
+      setInventoryItems(invRes.data || []);
+      
+      if (catRes.data && catRes.data.length > 0 && !formData.categoryId) {
+        setFormData(prev => ({ ...prev, categoryId: catRes.data[0].id.toString() }));
+      }
+    } catch (error) {
+      console.error('Error fetching data:', error);
     }
   };
 
   useEffect(() => {
     fetchData();
 
-    if (socket) {
-      socket.on('product_added', fetchData);
-      socket.on('product_updated', fetchData);
-      socket.on('product_deleted', fetchData);
-      socket.on('inventory_updated', fetchData);
-    }
+    const productsChannel = supabase
+      .channel('admin-products')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'products' }, fetchData)
+      .subscribe();
+
+    const categoriesChannel = supabase
+      .channel('admin-products-categories')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'categories' }, fetchData)
+      .subscribe();
+
+    const inventoryChannel = supabase
+      .channel('admin-products-inventory')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'inventory_items' }, fetchData)
+      .subscribe();
 
     return () => {
-      if (socket) {
-        socket.off('product_added');
-        socket.off('product_updated');
-        socket.off('product_deleted');
-        socket.off('inventory_updated');
-      }
+      supabase.removeChannel(productsChannel);
+      supabase.removeChannel(categoriesChannel);
+      supabase.removeChannel(inventoryChannel);
     };
-  }, [socket]);
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const payload = {
-        ...formData,
+      const productData = {
+        name: formData.name,
+        description: formData.description,
         price: parseFloat(formData.price as string),
         categoryId: parseInt(formData.categoryId),
-        inventoryItemId: formData.type === 'fixed' ? parseInt(formData.inventoryItemId) : null,
-        ingredients: formData.type === 'composed' ? formData.ingredients.map(i => ({
-          inventoryItemId: parseInt(i.inventoryItemId),
-          quantity: parseFloat(i.quantity)
-        })) : []
+        image: formData.image,
+        type: formData.type,
+        inventoryItemId: formData.type === 'fixed' ? parseInt(formData.inventoryItemId) : null
       };
 
+      let productId = editingId;
+
       if (editingId) {
-        await fetch(`/api/products/${editingId}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
-        });
+        // Update Product
+        const { error } = await supabase
+          .from('products')
+          .update(productData)
+          .eq('id', editingId);
+        if (error) throw error;
+
+        // Delete existing ingredients
+        await supabase.from('product_ingredients').delete().eq('productId', editingId);
       } else {
-        await fetch('/api/products', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
-        });
+        // Create Product
+        const { data, error } = await supabase
+          .from('products')
+          .insert([productData])
+          .select()
+          .single();
+        if (error) throw error;
+        productId = data.id;
       }
+
+      // Insert Ingredients if composed
+      if (formData.type === 'composed' && formData.ingredients.length > 0 && productId) {
+        const ingredientsToInsert = formData.ingredients.map(i => ({
+          productId: productId,
+          inventoryItemId: parseInt(i.inventoryItemId),
+          quantity: parseFloat(i.quantity)
+        }));
+        
+        const { error: ingError } = await supabase
+          .from('product_ingredients')
+          .insert(ingredientsToInsert);
+        
+        if (ingError) throw ingError;
+      }
+
       setIsModalOpen(false);
       setEditingId(null);
       setFormData({ 
@@ -98,6 +154,7 @@ export default function Products({ socket }: { socket: Socket | null }) {
       fetchData();
     } catch (error) {
       console.error('Error saving product:', error);
+      alert('Erro ao salvar produto');
     }
   };
 
@@ -133,10 +190,19 @@ export default function Products({ socket }: { socket: Socket | null }) {
   const handleDelete = async (id: number) => {
     if (!confirm('Tem certeza que deseja excluir este produto?')) return;
     try {
-      await fetch(`/api/products/${id}`, { method: 'DELETE' });
+      // Delete ingredients first (cascade usually handles this, but explicit is safer if not configured)
+      await supabase.from('product_ingredients').delete().eq('productId', id);
+      
+      const { error } = await supabase
+        .from('products')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
       fetchData();
     } catch (error) {
       console.error('Error deleting product:', error);
+      alert('Erro ao excluir produto');
     }
   };
 

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Socket } from 'socket.io-client';
 import { themeConfig } from '../../config/theme';
 import { Plus, Trash2, Edit2, Package, ArrowDownToLine } from 'lucide-react';
+import { supabase } from '../../lib/supabase';
 
 export default function Inventory({ socket }: { socket: Socket | null }) {
   const [items, setItems] = useState<any[]>([]);
@@ -12,58 +13,112 @@ export default function Inventory({ socket }: { socket: Socket | null }) {
   const [addQuantity, setAddQuantity] = useState(0);
 
   const fetchItems = async () => {
-    const res = await fetch('/api/inventory');
-    const data = await res.json();
-    setItems(data);
+    try {
+      const { data, error } = await supabase
+        .from('inventory_items')
+        .select('*')
+        .order('name');
+      
+      if (error) throw error;
+      setItems(data || []);
+    } catch (error) {
+      console.error('Error fetching inventory:', error);
+    }
   };
 
   useEffect(() => {
     fetchItems();
-    if (socket) {
-      socket.on('inventory_updated', fetchItems);
-    }
+    
+    const channel = supabase
+      .channel('admin-inventory')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'inventory_items' }, () => {
+        fetchItems();
+      })
+      .subscribe();
+
     return () => {
-      if (socket) socket.off('inventory_updated');
+      supabase.removeChannel(channel);
     };
-  }, [socket]);
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const method = selectedItem ? 'PUT' : 'POST';
-    const url = selectedItem ? `/api/inventory/${selectedItem.id}` : '/api/inventory';
-    
-    await fetch(url, {
-      method,
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(formData)
-    });
-    
-    setIsModalOpen(false);
-    setSelectedItem(null);
-    setFormData({ name: '', unit: 'un', currentStock: 0, minStock: 0 });
-    fetchItems();
+    try {
+      if (selectedItem) {
+        // Update
+        const { error } = await supabase
+          .from('inventory_items')
+          .update(formData)
+          .eq('id', selectedItem.id);
+        if (error) throw error;
+      } else {
+        // Create
+        const { error } = await supabase
+          .from('inventory_items')
+          .insert([formData]);
+        if (error) throw error;
+      }
+      
+      setIsModalOpen(false);
+      setSelectedItem(null);
+      setFormData({ name: '', unit: 'un', currentStock: 0, minStock: 0 });
+      // Realtime will update the list
+    } catch (error) {
+      console.error('Error saving inventory item:', error);
+      alert('Erro ao salvar item');
+    }
   };
 
   const handleAddStock = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedItem) return;
     
-    await fetch(`/api/inventory/${selectedItem.id}/add`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ quantity: addQuantity })
-    });
-    
-    setIsAddStockOpen(false);
-    setSelectedItem(null);
-    setAddQuantity(0);
-    fetchItems();
+    try {
+      // Fetch current stock first to ensure consistency (optional but good practice)
+      // For simplicity, we'll just increment using the current known value + addQuantity
+      // Or better, use a stored procedure or just update with current + new
+      
+      // Since Supabase doesn't have an atomic increment easily without RPC, we'll read then write
+      const { data: currentItem, error: fetchError } = await supabase
+        .from('inventory_items')
+        .select('currentStock')
+        .eq('id', selectedItem.id)
+        .single();
+        
+      if (fetchError) throw fetchError;
+
+      const newStock = (currentItem.currentStock || 0) + addQuantity;
+
+      const { error: updateError } = await supabase
+        .from('inventory_items')
+        .update({ currentStock: newStock })
+        .eq('id', selectedItem.id);
+
+      if (updateError) throw updateError;
+      
+      setIsAddStockOpen(false);
+      setSelectedItem(null);
+      setAddQuantity(0);
+      // Realtime will update the list
+    } catch (error) {
+      console.error('Error adding stock:', error);
+      alert('Erro ao adicionar estoque');
+    }
   };
 
   const handleDelete = async (id: number) => {
     if (!confirm('Tem certeza que deseja excluir este item do estoque?')) return;
-    await fetch(`/api/inventory/${id}`, { method: 'DELETE' });
-    fetchItems();
+    try {
+      const { error } = await supabase
+        .from('inventory_items')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+    } catch (error) {
+      console.error('Error deleting inventory item:', error);
+      alert('Erro ao excluir item. Verifique se ele não está vinculado a algum produto.');
+    }
   };
 
   return (

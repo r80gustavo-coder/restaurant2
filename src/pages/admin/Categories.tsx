@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Socket } from 'socket.io-client';
 import { themeConfig } from '../../config/theme';
 import { Plus, Trash2, Edit2, Tag } from 'lucide-react';
+import { supabase } from '../../lib/supabase';
 
 export default function Categories({ socket }: { socket: Socket | null }) {
   const [categories, setCategories] = useState<any[]>([]);
@@ -9,31 +10,66 @@ export default function Categories({ socket }: { socket: Socket | null }) {
   const [formData, setFormData] = useState({ name: '', icon: 'tag' });
 
   const fetchCategories = async () => {
-    const res = await fetch('/api/categories');
-    const data = await res.json();
-    setCategories(data);
+    try {
+      const { data, error } = await supabase
+        .from('categories')
+        .select('*')
+        .order('name');
+      
+      if (error) throw error;
+      setCategories(data || []);
+    } catch (error) {
+      console.error('Error fetching categories:', error);
+    }
   };
 
   useEffect(() => {
     fetchCategories();
-  }, [socket]);
+
+    const channel = supabase
+      .channel('admin-categories')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'categories' }, () => {
+        fetchCategories();
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    await fetch('/api/categories', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(formData)
-    });
-    setIsModalOpen(false);
-    setFormData({ name: '', icon: 'tag' });
-    fetchCategories();
+    try {
+      const { error } = await supabase
+        .from('categories')
+        .insert([formData]);
+
+      if (error) throw error;
+
+      setIsModalOpen(false);
+      setFormData({ name: '', icon: 'tag' });
+      // Realtime will update the list
+    } catch (error) {
+      console.error('Error creating category:', error);
+      alert('Erro ao criar categoria');
+    }
   };
 
   const handleDelete = async (id: number) => {
     if (!confirm('Tem certeza que deseja excluir esta categoria?')) return;
-    await fetch(`/api/categories/${id}`, { method: 'DELETE' });
-    fetchCategories();
+    try {
+      const { error } = await supabase
+        .from('categories')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+      // Realtime will update the list
+    } catch (error) {
+      console.error('Error deleting category:', error);
+      alert('Erro ao excluir categoria');
+    }
   };
 
   return (
