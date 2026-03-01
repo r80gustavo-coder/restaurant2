@@ -37,6 +37,17 @@ export default function Categories() {
     };
   }, []);
 
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setFormData({ ...formData, image: reader.result as string });
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
@@ -141,15 +152,25 @@ export default function Categories() {
               </div>
 
               <div>
-                <label className={`block text-sm font-semibold text-${themeConfig.colors.text} mb-1.5`}>URL da Imagem</label>
+                <label className={`block text-sm font-semibold text-${themeConfig.colors.text} mb-1.5`}>Imagem da Categoria</label>
                 <input 
-                  type="url" 
-                  value={formData.image}
-                  onChange={e => setFormData({...formData, image: e.target.value})}
-                  className={`w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-${themeConfig.colors.primary}/50 focus:border-${themeConfig.colors.primary} transition-all`}
-                  placeholder="https://exemplo.com/imagem.jpg"
+                  type="file" 
+                  accept="image/*"
+                  onChange={handleImageChange}
+                  className={`w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-${themeConfig.colors.primary}/50 focus:border-${themeConfig.colors.primary} transition-all bg-white file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-${themeConfig.colors.primary}/10 file:text-${themeConfig.colors.primary} hover:file:bg-${themeConfig.colors.primary}/20`}
                 />
-                <p className="text-xs text-slate-400 mt-1">Opcional. Use uma URL de imagem válida.</p>
+                {formData.image && (
+                  <div className="mt-3 h-32 w-full rounded-xl overflow-hidden border border-slate-200 relative group">
+                    <img src={formData.image} alt="Preview" className="w-full h-full object-cover" />
+                    <button
+                      type="button"
+                      onClick={() => setFormData({ ...formData, image: '' })}
+                      className="absolute top-2 right-2 p-1 bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  </div>
+                )}
               </div>
               
               <div className="pt-4 flex justify-end gap-3">
