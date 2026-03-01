@@ -1,9 +1,47 @@
-import { Outlet, Link, useLocation } from 'react-router-dom';
+import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
 import { Home, ShoppingCart, ClipboardList } from 'lucide-react';
 import { themeConfig } from '../config/theme';
+import { useEffect } from 'react';
+import { supabase } from '../lib/supabase';
 
 export default function CustomerLayout() {
   const location = useLocation();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    const tableId = localStorage.getItem('tableId');
+    if (!tableId) {
+      navigate('/login');
+      return;
+    }
+
+    // Monitor table status for auto-logout
+    const channel = supabase
+      .channel('customer-layout-table-status')
+      .on(
+        'postgres_changes', 
+        { event: 'UPDATE', schema: 'public', table: 'tables', filter: `id=eq.${tableId}` }, 
+        (payload) => {
+          console.log('Table update received:', payload);
+          const newTable = payload.new as any;
+          if (newTable.status === 'livre') {
+            console.log('Table is free, logging out...');
+            // Table was freed (checkout completed), log out user
+            localStorage.removeItem('tableId');
+            localStorage.removeItem('tableCode');
+            localStorage.removeItem('cart');
+            navigate('/login');
+          }
+        }
+      )
+      .subscribe((status) => {
+        console.log('Customer table subscription status:', status);
+      });
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [navigate]);
 
   const navItems = [
     { path: '/', icon: Home, label: 'Cardápio' },

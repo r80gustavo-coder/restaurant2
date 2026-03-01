@@ -22,68 +22,83 @@ export default function AdminLayout() {
     };
 
     const channel = supabase
-      .channel('admin-notifications')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, async (payload) => {
-        console.log('Notification payload:', payload);
-        const order = payload.new as any;
-        const oldOrder = payload.old as any;
-        let title = '';
-        let message = '';
-        let type = 'info';
+      .channel('admin-notifications-global')
+      .on(
+        'postgres_changes', 
+        { event: '*', schema: 'public', table: 'orders' }, 
+        async (payload) => {
+          console.log('🔔 Notification Event Received:', payload);
+          
+          const order = payload.new as any;
+          const oldOrder = payload.old as any;
+          let title = '';
+          let message = '';
+          let type = 'info';
 
-        if (payload.eventType === 'INSERT') {
-          const tableNum = await fetchTableNumber(order.tableId);
-          title = 'Novo Pedido';
-          message = `Mesa ${tableNum} - ${themeConfig.currency} ${order.total.toFixed(2)}`;
-          type = 'success';
-        } else if (payload.eventType === 'UPDATE') {
-          // Check if status changed. 
-          // Note: oldOrder might only contain ID depending on replica identity.
-          // If oldOrder.status is undefined, we assume it's a status update if the new status is different from what we might expect, 
-          // but safer to just check if we have both.
-          // If we can't verify change, we might skip or just notify.
-          // For now, let's assume if status is present in new payload, it's relevant.
-          
-          if (order.status && oldOrder && order.status !== oldOrder.status) {
-            const tableNum = await fetchTableNumber(order.tableId);
-            title = 'Atualização de Pedido';
-            const statusMap: Record<string, string> = {
-              pending: 'Pendente',
-              preparing: 'Preparando',
-              ready: 'Pronto',
-              delivered: 'Entregue',
-              paid: 'Pago',
-              cancelled: 'Cancelado'
-            };
-            message = `Mesa ${tableNum}: Status alterado para ${statusMap[order.status] || order.status}`;
-            type = 'info';
-          }
-        }
-
-        if (title) {
-          const newNotification = {
-            id: Date.now(),
-            title,
-            message,
-            time: new Date(),
-            type,
-            read: false
-          };
-          
-          setNotifications(prev => [newNotification, ...prev]);
-          
-          // Play sound
-          if (audioRef.current) {
-            try {
-              await audioRef.current.play();
-            } catch (e) {
-              console.error('Error playing sound (user interaction needed?):', e);
+          try {
+            if (payload.eventType === 'INSERT') {
+              console.log('Processing INSERT event');
+              const tableNum = await fetchTableNumber(order.tableId);
+              title = 'Novo Pedido';
+              message = `Mesa ${tableNum} - ${themeConfig.currency} ${order.total?.toFixed(2) || '0.00'}`;
+              type = 'success';
+            } else if (payload.eventType === 'UPDATE') {
+              console.log('Processing UPDATE event', { newStatus: order.status, oldStatus: oldOrder?.status });
+              
+              // If we have both statuses and they are different
+              if (order.status && oldOrder && order.status !== oldOrder.status) {
+                const tableNum = await fetchTableNumber(order.tableId);
+                title = 'Atualização de Pedido';
+                const statusMap: Record<string, string> = {
+                  pending: 'Pendente',
+                  preparing: 'Preparando',
+                  ready: 'Pronto',
+                  delivered: 'Entregue',
+                  paid: 'Pago',
+                  cancelled: 'Cancelado'
+                };
+                message = `Mesa ${tableNum}: Status alterado para ${statusMap[order.status] || order.status}`;
+                type = 'info';
+              } 
+              // Fallback: if we don't have old status (e.g. no replica identity), we can't be sure it changed, 
+              // but we can notify on specific important statuses if needed. 
+              // For now, we rely on the check above.
             }
+
+            if (title) {
+              console.log('Creating notification:', title);
+              const newNotification = {
+                id: Date.now(),
+                title,
+                message,
+                time: new Date(),
+                type,
+                read: false
+              };
+              
+              setNotifications(prev => [newNotification, ...prev]);
+              
+              // Play sound
+              if (audioRef.current) {
+                console.log('Attempting to play sound...');
+                const playPromise = audioRef.current.play();
+                if (playPromise !== undefined) {
+                  playPromise
+                    .then(() => console.log('Sound played successfully'))
+                    .catch(e => console.error('Error playing sound (likely blocked):', e));
+                }
+              }
+            }
+          } catch (err) {
+            console.error('Error processing notification payload:', err);
           }
         }
-      })
+      )
       .subscribe((status) => {
-        console.log('Notification subscription status:', status);
+        console.log('🔌 Admin Notifications Subscription Status:', status);
+        if (status === 'SUBSCRIBED') {
+          console.log('Ready to receive notifications');
+        }
       });
 
     return () => {

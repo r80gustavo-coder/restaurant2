@@ -57,28 +57,9 @@ export default function Menu() {
       })
       .subscribe();
 
-    const tablesChannel = supabase
-      .channel('menu-table-status')
-      .on(
-        'postgres_changes', 
-        { event: 'UPDATE', schema: 'public', table: 'tables', filter: `id=eq.${tableId}` }, 
-        (payload) => {
-          const newTable = payload.new as any;
-          if (newTable.status === 'livre') {
-            // Table was freed (checkout completed), log out user
-            localStorage.removeItem('tableId');
-            localStorage.removeItem('tableCode');
-            localStorage.removeItem('cart');
-            navigate('/login');
-          }
-        }
-      )
-      .subscribe();
-
     return () => {
       supabase.removeChannel(productsChannel);
       supabase.removeChannel(categoriesChannel);
-      supabase.removeChannel(tablesChannel);
     };
   }, [navigate]);
 
