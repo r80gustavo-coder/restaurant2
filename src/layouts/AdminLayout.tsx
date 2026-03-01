@@ -12,22 +12,25 @@ export default function AdminLayout() {
   const [showNotifications, setShowNotifications] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
+  const [connectionStatus, setConnectionStatus] = useState('connecting');
+
   useEffect(() => {
     // Initialize audio
-    audioRef.current = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3'); // Simple bell sound
+    audioRef.current = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
     
     const fetchTableNumber = async (tableId: number) => {
       const { data } = await supabase.from('tables').select('number').eq('id', tableId).single();
       return data?.number || '?';
     };
 
+    // Create a unique channel name to avoid conflicts
     const channel = supabase
-      .channel('admin-notifications-global')
+      .channel(`admin-orders-${Date.now()}`)
       .on(
         'postgres_changes', 
         { event: '*', schema: 'public', table: 'orders' }, 
         async (payload) => {
-          console.log('🔔 Notification Event Received:', payload);
+          console.log('🔔 REALTIME EVENT RECEIVED:', payload);
           
           const order = payload.new as any;
           const oldOrder = payload.old as any;
@@ -37,15 +40,12 @@ export default function AdminLayout() {
 
           try {
             if (payload.eventType === 'INSERT') {
-              console.log('Processing INSERT event');
               const tableNum = await fetchTableNumber(order.tableId);
               title = 'Novo Pedido';
-              message = `Mesa ${tableNum} - ${themeConfig.currency} ${order.total?.toFixed(2) || '0.00'}`;
+              message = `Mesa ${tableNum} - ${themeConfig.currency} ${order.total?.toFixed(2)}`;
               type = 'success';
             } else if (payload.eventType === 'UPDATE') {
-              console.log('Processing UPDATE event', { newStatus: order.status, oldStatus: oldOrder?.status });
-              
-              // If we have both statuses and they are different
+              // Only notify if status changed
               if (order.status && oldOrder && order.status !== oldOrder.status) {
                 const tableNum = await fetchTableNumber(order.tableId);
                 title = 'Atualização de Pedido';
@@ -59,14 +59,10 @@ export default function AdminLayout() {
                 };
                 message = `Mesa ${tableNum}: Status alterado para ${statusMap[order.status] || order.status}`;
                 type = 'info';
-              } 
-              // Fallback: if we don't have old status (e.g. no replica identity), we can't be sure it changed, 
-              // but we can notify on specific important statuses if needed. 
-              // For now, we rely on the check above.
+              }
             }
 
             if (title) {
-              console.log('Creating notification:', title);
               const newNotification = {
                 id: Date.now(),
                 title,
@@ -78,27 +74,18 @@ export default function AdminLayout() {
               
               setNotifications(prev => [newNotification, ...prev]);
               
-              // Play sound
               if (audioRef.current) {
-                console.log('Attempting to play sound...');
-                const playPromise = audioRef.current.play();
-                if (playPromise !== undefined) {
-                  playPromise
-                    .then(() => console.log('Sound played successfully'))
-                    .catch(e => console.error('Error playing sound (likely blocked):', e));
-                }
+                audioRef.current.play().catch(e => console.log('Sound blocked until user interaction'));
               }
             }
           } catch (err) {
-            console.error('Error processing notification payload:', err);
+            console.error('Error processing notification:', err);
           }
         }
       )
       .subscribe((status) => {
-        console.log('🔌 Admin Notifications Subscription Status:', status);
-        if (status === 'SUBSCRIBED') {
-          console.log('Ready to receive notifications');
-        }
+        console.log('🔌 Realtime Status:', status);
+        setConnectionStatus(status);
       });
 
     return () => {
@@ -188,6 +175,12 @@ export default function AdminLayout() {
           </h2>
           
           <div className="relative flex items-center gap-4">
+            {connectionStatus !== 'SUBSCRIBED' && (
+              <span className="text-xs text-red-500 font-medium bg-red-50 px-2 py-1 rounded-lg border border-red-100">
+                {connectionStatus === 'CHANNEL_ERROR' ? 'Erro de Conexão' : 'Conectando...'}
+              </span>
+            )}
+            
             <button 
               onClick={testNotification}
               className="px-3 py-1 text-xs font-medium text-slate-500 hover:bg-slate-100 rounded-lg border border-slate-200"
