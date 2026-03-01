@@ -40,6 +40,7 @@ export default function Cart() {
         .insert([{
           tableId: parseInt(tableId!),
           status: 'pending',
+          paymentStatus: 'pending',
           total: total
         }])
         .select()

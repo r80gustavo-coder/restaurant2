@@ -71,7 +71,11 @@ export default function Checkout() {
     
     try {
       // 1. Get all pending orders for this table
-      const tableOrders = orders.filter(o => o.tableId === selectedTable.id && o.paymentStatus === 'pending' && o.status !== 'cancelled');
+      const tableOrders = orders.filter(o => 
+        o.tableId === selectedTable.id && 
+        (o.paymentStatus === 'pending' || o.paymentStatus === null) && 
+        o.status !== 'cancelled'
+      );
       
       if (tableOrders.length === 0) return;
 
@@ -98,7 +102,7 @@ export default function Checkout() {
       if (updateTableError) throw updateTableError;
       
       setSelectedTable(null);
-      // Realtime will update the UI
+      fetchData(); // Force refresh
     } catch (error) {
       console.error('Error processing payment:', error);
       alert('Erro ao processar pagamento');
@@ -107,7 +111,7 @@ export default function Checkout() {
 
   const occupiedTables = tables.filter(t => t.status === 'ocupada');
   const tableOrders = selectedTable 
-    ? orders.filter(o => o.tableId === selectedTable.id && o.paymentStatus === 'pending' && o.status !== 'cancelled')
+    ? orders.filter(o => o.tableId === selectedTable.id && (o.paymentStatus === 'pending' || o.paymentStatus === null) && o.status !== 'cancelled')
     : [];
     
   const totalToPay = tableOrders.reduce((sum, order) => sum + order.total, 0);
