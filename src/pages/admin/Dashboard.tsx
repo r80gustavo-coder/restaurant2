@@ -3,6 +3,7 @@ import { Socket } from 'socket.io-client';
 import { themeConfig } from '../../config/theme';
 import { TrendingUp, ShoppingBag, Clock, DollarSign, Users } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { supabase } from '../../lib/supabase';
 
 export default function Dashboard({ socket }: { socket: Socket | null }) {
   const [stats, setStats] = useState({
@@ -11,14 +12,26 @@ export default function Dashboard({ socket }: { socket: Socket | null }) {
     pendingOrders: 0,
   });
   const [tables, setTables] = useState<any[]>([]);
-
   const [recentOrders, setRecentOrders] = useState<any[]>([]);
 
   const fetchStats = async () => {
     try {
-      const res = await fetch('/api/dashboard/stats');
-      const data = await res.json();
-      setStats(data);
+      // Buscar todos os pedidos
+      const { data: orders, error } = await supabase
+        .from('orders')
+        .select('*');
+
+      if (error) throw error;
+
+      const totalOrders = orders?.length || 0;
+      const totalRevenue = orders?.reduce((sum, order) => sum + (order.total || 0), 0) || 0;
+      const pendingOrders = orders?.filter(o => o.status === 'pending').length || 0;
+
+      setStats({
+        totalOrders,
+        totalRevenue,
+        pendingOrders
+      });
     } catch (error) {
       console.error('Error fetching stats:', error);
     }
@@ -26,9 +39,25 @@ export default function Dashboard({ socket }: { socket: Socket | null }) {
 
   const fetchRecentOrders = async () => {
     try {
-      const res = await fetch('/api/orders');
-      const data = await res.json();
-      setRecentOrders(data.slice(0, 5));
+      const { data, error } = await supabase
+        .from('orders')
+        .select(`
+          *,
+          table:tables (
+            number
+          )
+        `)
+        .order('createdAt', { ascending: false })
+        .limit(5);
+
+      if (error) throw error;
+
+      const formattedOrders = data?.map(order => ({
+        ...order,
+        tableNumber: order.table?.number
+      })) || [];
+
+      setRecentOrders(formattedOrders);
     } catch (error) {
       console.error('Error fetching recent orders:', error);
     }
@@ -36,9 +65,12 @@ export default function Dashboard({ socket }: { socket: Socket | null }) {
 
   const fetchTables = async () => {
     try {
-      const res = await fetch('/api/tables');
-      const data = await res.json();
-      setTables(data);
+      const { data, error } = await supabase
+        .from('tables')
+        .select('*');
+      
+      if (error) throw error;
+      setTables(data || []);
     } catch (error) {
       console.error('Error fetching tables:', error);
     }
@@ -49,28 +81,27 @@ export default function Dashboard({ socket }: { socket: Socket | null }) {
     fetchRecentOrders();
     fetchTables();
 
-    if (socket) {
-      socket.on('new_order', () => {
+    // Realtime subscriptions
+    const ordersChannel = supabase
+      .channel('dashboard-orders')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, () => {
         fetchStats();
         fetchRecentOrders();
-      });
-      socket.on('order_status_updated', () => {
-        fetchStats();
-        fetchRecentOrders();
-      });
-      socket.on('table_updated', () => {
+      })
+      .subscribe();
+
+    const tablesChannel = supabase
+      .channel('dashboard-tables')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'tables' }, () => {
         fetchTables();
-      });
-    }
+      })
+      .subscribe();
 
     return () => {
-      if (socket) {
-        socket.off('new_order');
-        socket.off('order_status_updated');
-        socket.off('table_updated');
-      }
+      supabase.removeChannel(ordersChannel);
+      supabase.removeChannel(tablesChannel);
     };
-  }, [socket]);
+  }, []);
 
   const data = [
     { name: 'Seg', vendas: 4000 },
