@@ -4,6 +4,7 @@ import { Socket } from 'socket.io-client';
 import { themeConfig } from '../../config/theme';
 import { Search, Plus, Minus, ShoppingBag, X, Sparkles, UtensilsCrossed } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import { supabase } from '../../lib/supabase';
 
 export default function Menu({ socket }: { socket: Socket | null }) {
   const navigate = useNavigate();
@@ -26,14 +27,15 @@ export default function Menu({ socket }: { socket: Socket | null }) {
     const fetchData = async () => {
       try {
         const [prodRes, catRes] = await Promise.all([
-          fetch('/api/products'),
-          fetch('/api/categories')
+          supabase.from('products').select('*').order('name'),
+          supabase.from('categories').select('*').order('name')
         ]);
-        const prodData = await prodRes.json();
-        const catData = await catRes.json();
+
+        if (prodRes.error) throw prodRes.error;
+        if (catRes.error) throw catRes.error;
         
-        setProducts(prodData);
-        setCategories(catData);
+        setProducts(prodRes.data || []);
+        setCategories(catRes.data || []);
       } catch (error) {
         console.error('Error fetching data:', error);
       }
@@ -41,20 +43,26 @@ export default function Menu({ socket }: { socket: Socket | null }) {
 
     fetchData();
 
-    if (socket) {
-      socket.on('product_added', fetchData);
-      socket.on('product_updated', fetchData);
-      socket.on('product_deleted', fetchData);
-    }
+    // Realtime subscriptions
+    const productsChannel = supabase
+      .channel('menu-products')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'products' }, () => {
+        fetchData();
+      })
+      .subscribe();
+
+    const categoriesChannel = supabase
+      .channel('menu-categories')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'categories' }, () => {
+        fetchData();
+      })
+      .subscribe();
 
     return () => {
-      if (socket) {
-        socket.off('product_added');
-        socket.off('product_updated');
-        socket.off('product_deleted');
-      }
+      supabase.removeChannel(productsChannel);
+      supabase.removeChannel(categoriesChannel);
     };
-  }, [navigate, socket]);
+  }, [navigate]);
 
   const filteredProducts = products.filter(p => {
     const matchesCategory = activeCategory === 'all' || p.categoryId === parseInt(activeCategory);

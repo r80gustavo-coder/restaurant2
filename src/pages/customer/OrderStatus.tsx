@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Socket } from 'socket.io-client';
 import { themeConfig } from '../../config/theme';
 import { Clock, ChefHat, CheckCircle2, PackageCheck } from 'lucide-react';
+import { supabase } from '../../lib/supabase';
 
 export default function OrderStatus({ socket }: { socket: Socket | null }) {
   const navigate = useNavigate();
@@ -16,10 +17,14 @@ export default function OrderStatus({ socket }: { socket: Socket | null }) {
     }
 
     try {
-      const res = await fetch('/api/orders');
-      const data = await res.json();
-      const myOrders = data.filter((o: any) => o.tableId === parseInt(tableId));
-      setOrders(myOrders);
+      const { data, error } = await supabase
+        .from('orders')
+        .select('*')
+        .eq('tableId', parseInt(tableId))
+        .order('createdAt', { ascending: false });
+
+      if (error) throw error;
+      setOrders(data || []);
     } catch (error) {
       console.error('Error fetching orders:', error);
     }
@@ -28,28 +33,31 @@ export default function OrderStatus({ socket }: { socket: Socket | null }) {
   useEffect(() => {
     fetchOrders();
 
-    if (socket) {
-      socket.on('new_order', (order) => {
-        const tableId = localStorage.getItem('tableId');
-        if (order.tableId === parseInt(tableId!)) {
-          setOrders(prev => [order, ...prev]);
+    const tableId = localStorage.getItem('tableId');
+    if (!tableId) return;
+
+    // Realtime subscription for orders
+    const channel = supabase
+      .channel('customer-orders')
+      .on(
+        'postgres_changes',
+        { 
+          event: '*', 
+          schema: 'public', 
+          table: 'orders',
+          filter: `tableId=eq.${tableId}`
+        },
+        (payload) => {
+          console.log('Order update:', payload);
+          fetchOrders();
         }
-      });
-      socket.on('order_status_updated', (updatedOrder) => {
-        const tableId = localStorage.getItem('tableId');
-        if (updatedOrder.tableId === parseInt(tableId!)) {
-          setOrders(prev => prev.map(o => o.id === updatedOrder.id ? updatedOrder : o));
-        }
-      });
-    }
+      )
+      .subscribe();
 
     return () => {
-      if (socket) {
-        socket.off('new_order');
-        socket.off('order_status_updated');
-      }
+      supabase.removeChannel(channel);
     };
-  }, [navigate, socket]);
+  }, [navigate]);
 
   const getStatusIcon = (status: string) => {
     switch (status) {

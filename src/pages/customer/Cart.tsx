@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Socket } from 'socket.io-client';
 import { themeConfig } from '../../config/theme';
 import { Trash2, ShoppingBag, ArrowRight } from 'lucide-react';
+import { supabase } from '../../lib/supabase';
 
 export default function Cart({ socket }: { socket: Socket | null }) {
   const navigate = useNavigate();
@@ -34,27 +35,40 @@ export default function Cart({ socket }: { socket: Socket | null }) {
     const tableId = localStorage.getItem('tableId');
     
     try {
-      const res = await fetch('/api/orders', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+      // 1. Criar o pedido
+      const { data: order, error: orderError } = await supabase
+        .from('orders')
+        .insert([{
           tableId: parseInt(tableId!),
+          status: 'pending',
+          total: total,
           items: cart.map(item => ({
             productId: item.id,
+            name: item.name,
+            price: item.price,
             quantity: item.quantity,
             notes: item.notes
-          })),
-          total
-        })
-      });
+          }))
+        }])
+        .select()
+        .single();
 
-      if (res.ok) {
-        localStorage.removeItem('cart');
-        setCart([]);
-        navigate('/status');
-      }
+      if (orderError) throw orderError;
+
+      // 2. Atualizar status da mesa para ocupada
+      await supabase
+        .from('tables')
+        .update({ status: 'ocupada' })
+        .eq('id', parseInt(tableId!));
+
+      // 3. Limpar carrinho e redirecionar
+      localStorage.removeItem('cart');
+      setCart([]);
+      navigate('/status');
+      
     } catch (error) {
       console.error('Error placing order:', error);
+      alert('Erro ao enviar pedido. Tente novamente.');
     } finally {
       setLoading(false);
     }

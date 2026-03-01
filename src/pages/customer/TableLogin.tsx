@@ -67,7 +67,7 @@ export default function TableLogin() {
       // Login bem-sucedido
       localStorage.setItem('tableId', table.id.toString());
       localStorage.setItem('tableNumber', table.number.toString());
-      navigate('/menu'); // Redirecionar para o menu (rota correta do cliente)
+      navigate('/'); // Redirecionar para a home (rota correta do cliente)
       
     } catch (err: any) {
       console.error('Login error:', err);
