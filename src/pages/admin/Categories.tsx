@@ -48,21 +48,46 @@ export default function Categories() {
     }
   };
 
+  const [editingCategory, setEditingCategory] = useState<any | null>(null);
+
+  const handleOpenModal = (category?: any) => {
+    if (category) {
+      setEditingCategory(category);
+      setFormData({ name: category.name, icon: category.icon || 'tag', image: category.image || '' });
+    } else {
+      setEditingCategory(null);
+      setFormData({ name: '', icon: 'tag', image: '' });
+    }
+    setIsModalOpen(true);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const { error } = await supabase
-        .from('categories')
-        .insert([formData]);
-
-      if (error) throw error;
+      if (editingCategory) {
+        const { error } = await supabase
+          .from('categories')
+          .update(formData)
+          .eq('id', editingCategory.id);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase
+          .from('categories')
+          .insert([formData]);
+        if (error) throw error;
+      }
 
       setIsModalOpen(false);
       setFormData({ name: '', icon: 'tag', image: '' });
-      // Realtime will update the list
-    } catch (error) {
-      console.error('Error creating category:', error);
-      alert('Erro ao criar categoria. Verifique se a coluna "image" existe no banco de dados.');
+      setEditingCategory(null);
+    } catch (error: any) {
+      console.error('Error saving category:', error);
+      // Check for payload too large error (413) or string too long
+      if (error.message && (error.message.includes('payload') || error.message.includes('too large') || error.code === '22001')) {
+         alert('A imagem selecionada é muito grande. Por favor, escolha uma imagem menor (máx 1MB).');
+      } else {
+         alert('Erro ao salvar categoria: ' + (error.message || 'Erro desconhecido'));
+      }
     }
   };
 
@@ -87,7 +112,7 @@ export default function Categories() {
       <div className="flex justify-between items-center">
         <h2 className={`text-2xl font-bold text-${themeConfig.colors.text}`}>Categorias</h2>
         <button 
-          onClick={() => setIsModalOpen(true)}
+          onClick={() => handleOpenModal()}
           className={`flex items-center gap-2 px-4 py-2 bg-${themeConfig.colors.primary} text-white rounded-xl hover:bg-${themeConfig.colors.primaryHover} transition-colors font-medium`}
         >
           <Plus size={20} /> Nova Categoria
@@ -116,12 +141,20 @@ export default function Categories() {
             <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent flex flex-col justify-end p-6">
               <div className="flex items-center justify-between">
                 <h3 className="text-xl font-bold text-white">{cat.name}</h3>
-                <button 
-                  onClick={() => handleDelete(cat.id)}
-                  className="p-2 text-white/80 hover:text-red-400 hover:bg-white/10 rounded-lg transition-colors"
-                >
-                  <Trash2 size={18} />
-                </button>
+                <div className="flex gap-1">
+                  <button 
+                    onClick={() => handleOpenModal(cat)}
+                    className="p-2 text-white/80 hover:text-blue-400 hover:bg-white/10 rounded-lg transition-colors"
+                  >
+                    <Edit2 size={18} />
+                  </button>
+                  <button 
+                    onClick={() => handleDelete(cat.id)}
+                    className="p-2 text-white/80 hover:text-red-400 hover:bg-white/10 rounded-lg transition-colors"
+                  >
+                    <Trash2 size={18} />
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -132,7 +165,9 @@ export default function Categories() {
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex justify-center items-center z-50 p-4">
           <div className={`bg-${themeConfig.colors.surface} rounded-2xl shadow-xl w-full max-w-md overflow-hidden`}>
             <div className="p-6 border-b border-slate-100 flex justify-between items-center">
-              <h3 className={`text-xl font-bold text-${themeConfig.colors.text}`}>Nova Categoria</h3>
+              <h3 className={`text-xl font-bold text-${themeConfig.colors.text}`}>
+                {editingCategory ? 'Editar Categoria' : 'Nova Categoria'}
+              </h3>
               <button onClick={() => setIsModalOpen(false)} className={`text-${themeConfig.colors.textMuted} hover:bg-slate-100 p-2 rounded-xl transition-colors`}>
                 &times;
               </button>
