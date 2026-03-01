@@ -64,21 +64,16 @@ export default function Categories() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      // Create a copy of formData without the image field for now, 
-      // since the column doesn't exist in the database yet.
-      // We will only save the name and icon.
-      const { image, ...dataToSave } = formData;
-
       if (editingCategory) {
         const { error } = await supabase
           .from('categories')
-          .update(dataToSave)
+          .update(formData)
           .eq('id', editingCategory.id);
         if (error) throw error;
       } else {
         const { error } = await supabase
           .from('categories')
-          .insert([dataToSave]);
+          .insert([formData]);
         if (error) throw error;
       }
 
@@ -87,7 +82,12 @@ export default function Categories() {
       setEditingCategory(null);
     } catch (error: any) {
       console.error('Error saving category:', error);
-      alert('Erro ao salvar categoria: ' + (error.message || 'Erro desconhecido'));
+      // Check for payload too large error (413) or string too long
+      if (error.message && (error.message.includes('payload') || error.message.includes('too large') || error.code === '22001')) {
+         alert('A imagem selecionada é muito grande. Por favor, escolha uma imagem menor (máx 1MB).');
+      } else {
+         alert('Erro ao salvar categoria: ' + (error.message || 'Erro desconhecido'));
+      }
     }
   };
 
