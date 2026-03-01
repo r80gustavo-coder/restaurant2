@@ -6,7 +6,7 @@ import { supabase } from '../../lib/supabase';
 export default function Categories() {
   const [categories, setCategories] = useState<any[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [formData, setFormData] = useState({ name: '', icon: 'tag' });
+  const [formData, setFormData] = useState({ name: '', icon: 'tag', image: '' });
 
   const fetchCategories = async () => {
     try {
@@ -47,11 +47,11 @@ export default function Categories() {
       if (error) throw error;
 
       setIsModalOpen(false);
-      setFormData({ name: '', icon: 'tag' });
+      setFormData({ name: '', icon: 'tag', image: '' });
       // Realtime will update the list
     } catch (error) {
       console.error('Error creating category:', error);
-      alert('Erro ao criar categoria');
+      alert('Erro ao criar categoria. Verifique se a coluna "image" existe no banco de dados.');
     }
   };
 
@@ -85,19 +85,34 @@ export default function Categories() {
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
         {categories.map((cat) => (
-          <div key={cat.id} className={`bg-${themeConfig.colors.surface} p-6 rounded-2xl shadow-sm border border-slate-200 flex items-center justify-between group`}>
-            <div className="flex items-center gap-4">
-              <div className={`w-12 h-12 rounded-xl bg-${themeConfig.colors.primary}/10 flex items-center justify-center text-${themeConfig.colors.primary}`}>
-                <Tag size={24} />
+          <div 
+            key={cat.id} 
+            className={`relative overflow-hidden h-40 rounded-2xl shadow-sm border border-slate-200 group`}
+          >
+            {cat.image ? (
+              <img 
+                src={cat.image} 
+                alt={cat.name} 
+                className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+                referrerPolicy="no-referrer"
+              />
+            ) : (
+              <div className={`absolute inset-0 bg-${themeConfig.colors.surface} flex items-center justify-center`}>
+                <Tag size={48} className={`text-${themeConfig.colors.primary}/20`} />
               </div>
-              <h3 className={`text-lg font-bold text-${themeConfig.colors.text}`}>{cat.name}</h3>
+            )}
+            
+            <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent flex flex-col justify-end p-6">
+              <div className="flex items-center justify-between">
+                <h3 className="text-xl font-bold text-white">{cat.name}</h3>
+                <button 
+                  onClick={() => handleDelete(cat.id)}
+                  className="p-2 text-white/80 hover:text-red-400 hover:bg-white/10 rounded-lg transition-colors"
+                >
+                  <Trash2 size={18} />
+                </button>
+              </div>
             </div>
-            <button 
-              onClick={() => handleDelete(cat.id)}
-              className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
-            >
-              <Trash2 size={18} />
-            </button>
           </div>
         ))}
       </div>
@@ -123,6 +138,18 @@ export default function Categories() {
                   className={`w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-${themeConfig.colors.primary}/50 focus:border-${themeConfig.colors.primary} transition-all`}
                   placeholder="Ex: Sobremesas"
                 />
+              </div>
+
+              <div>
+                <label className={`block text-sm font-semibold text-${themeConfig.colors.text} mb-1.5`}>URL da Imagem</label>
+                <input 
+                  type="url" 
+                  value={formData.image}
+                  onChange={e => setFormData({...formData, image: e.target.value})}
+                  className={`w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-${themeConfig.colors.primary}/50 focus:border-${themeConfig.colors.primary} transition-all`}
+                  placeholder="https://exemplo.com/imagem.jpg"
+                />
+                <p className="text-xs text-slate-400 mt-1">Opcional. Use uma URL de imagem válida.</p>
               </div>
               
               <div className="pt-4 flex justify-end gap-3">

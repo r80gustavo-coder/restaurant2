@@ -9,7 +9,7 @@ export default function Menu() {
   const navigate = useNavigate();
   const [products, setProducts] = useState<any[]>([]);
   const [categories, setCategories] = useState<any[]>([]);
-  const [activeCategory, setActiveCategory] = useState<string>('all');
+  const [activeCategory, setActiveCategory] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedProduct, setSelectedProduct] = useState<any | null>(null);
   const [quantity, setQuantity] = useState(1);
@@ -64,11 +64,14 @@ export default function Menu() {
   }, [navigate]);
 
   const filteredProducts = products.filter(p => {
-    const matchesCategory = activeCategory === 'all' || p.categoryId === parseInt(activeCategory);
+    const matchesCategory = activeCategory ? p.categoryId === parseInt(activeCategory) : true;
     const matchesSearch = p.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
                           (p.description && p.description.toLowerCase().includes(searchQuery.toLowerCase()));
     return matchesCategory && matchesSearch;
   });
+
+  // If search is active, we show products regardless of category selection
+  const showProducts = activeCategory !== null || searchQuery.length > 0;
 
   const addToCart = () => {
     if (!selectedProduct) return;
@@ -106,6 +109,14 @@ export default function Menu() {
       {/* Search & Generate Header */}
       <div className={`bg-${themeConfig.colors.surface} px-6 py-4 sticky top-[72px] z-40 shadow-sm border-b border-slate-100`}>
         <div className="flex gap-3">
+          {activeCategory && !searchQuery && (
+            <button 
+              onClick={() => setActiveCategory(null)}
+              className="p-3.5 rounded-2xl bg-slate-100 text-slate-600 hover:bg-slate-200 transition-colors"
+            >
+              <X size={20} />
+            </button>
+          )}
           <div className="relative flex-1">
             <Search className={`absolute left-4 top-1/2 -translate-y-1/2 text-${themeConfig.colors.textMuted}`} size={20} />
             <input
@@ -136,85 +147,97 @@ export default function Menu() {
         </div>
       </div>
 
-      {/* Categories */}
-      <div className="px-6 py-6 overflow-x-auto hide-scrollbar">
-        <div className="flex gap-3 min-w-max">
-          <button
-            onClick={() => setActiveCategory('all')}
-            className={`px-6 py-3 rounded-2xl font-bold whitespace-nowrap transition-all ${
-              activeCategory === 'all'
-                ? `bg-${themeConfig.colors.text} text-white shadow-lg shadow-slate-200 scale-105`
-                : `bg-white text-${themeConfig.colors.textMuted} hover:bg-slate-50 border border-slate-200`
-            }`}
-          >
-            Todos
-          </button>
-          {categories.map(cat => (
-            <button
-              key={cat.id}
-              onClick={() => setActiveCategory(cat.id.toString())}
-              className={`px-6 py-3 rounded-2xl font-bold whitespace-nowrap transition-all ${
-                activeCategory === cat.id.toString()
-                  ? `bg-${themeConfig.colors.text} text-white shadow-lg shadow-slate-200 scale-105`
-                  : `bg-white text-${themeConfig.colors.textMuted} hover:bg-slate-50 border border-slate-200`
-              }`}
-            >
-              {cat.name}
-            </button>
-          ))}
+      {!showProducts ? (
+        /* Categories Grid */
+        <div className="p-6">
+          <h2 className={`text-xl font-bold text-${themeConfig.colors.text} mb-4`}>Categorias</h2>
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+            {categories.map((cat) => (
+              <motion.div
+                key={cat.id}
+                whileTap={{ scale: 0.95 }}
+                onClick={() => setActiveCategory(cat.id.toString())}
+                className="relative h-32 rounded-2xl overflow-hidden shadow-sm cursor-pointer group"
+              >
+                {cat.image ? (
+                  <img 
+                    src={cat.image} 
+                    alt={cat.name} 
+                    className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+                    referrerPolicy="no-referrer"
+                  />
+                ) : (
+                  <div className={`absolute inset-0 bg-${themeConfig.colors.surface} flex items-center justify-center`}>
+                    <UtensilsCrossed size={32} className={`text-${themeConfig.colors.primary}/20`} />
+                  </div>
+                )}
+                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent flex items-end p-4">
+                  <h3 className="text-white font-bold text-lg leading-tight">{cat.name}</h3>
+                </div>
+              </motion.div>
+            ))}
+          </div>
         </div>
-      </div>
+      ) : (
+        /* Product List */
+        <div className="px-6 py-6 space-y-4">
+          <div className="flex items-center justify-between mb-2">
+            <h2 className={`text-xl font-bold text-${themeConfig.colors.text}`}>
+              {searchQuery ? 'Resultados da busca' : categories.find(c => c.id.toString() === activeCategory)?.name || 'Produtos'}
+            </h2>
+            <span className={`text-sm font-medium text-${themeConfig.colors.textMuted}`}>
+              {filteredProducts.length} itens
+            </span>
+          </div>
 
-      {/* Product List */}
-      <div className="px-6 space-y-4">
-        <AnimatePresence mode='popLayout'>
-          {filteredProducts.map(product => (
-            <motion.div 
-              layout
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.9 }}
-              key={product.id} 
-              onClick={() => { setSelectedProduct(product); setQuantity(1); setNotes(''); }}
-              className={`bg-white p-4 rounded-[2rem] shadow-sm border border-slate-100 flex gap-5 cursor-pointer hover:shadow-md hover:border-${themeConfig.colors.primary}/20 transition-all active:scale-[0.98] group`}
-            >
-              {product.image ? (
-                <div className="w-32 h-32 rounded-2xl overflow-hidden shadow-sm shrink-0">
-                  <img src={product.image} alt={product.name} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" referrerPolicy="no-referrer" />
-                </div>
-              ) : (
-                <div className="w-32 h-32 rounded-2xl bg-slate-100 flex items-center justify-center text-slate-300 shrink-0">
-                  <UtensilsCrossed size={32} />
-                </div>
-              )}
-              <div className="flex-1 flex flex-col justify-between py-2">
-                <div>
-                  <h3 className={`font-bold text-xl text-${themeConfig.colors.text} leading-tight mb-2`}>{product.name}</h3>
-                  <p className={`text-sm text-${themeConfig.colors.textMuted} line-clamp-2 leading-relaxed`}>{product.description}</p>
-                </div>
-                <div className="flex justify-between items-end mt-2">
-                  <p className={`font-black text-xl text-${themeConfig.colors.primary}`}>
-                    {themeConfig.currency} {product.price.toFixed(2)}
-                  </p>
-                  <div className={`w-10 h-10 rounded-full bg-slate-50 flex items-center justify-center text-${themeConfig.colors.primary} group-hover:bg-${themeConfig.colors.primary} group-hover:text-white transition-colors`}>
-                    <Plus size={20} />
+          <AnimatePresence mode='popLayout'>
+            {filteredProducts.map(product => (
+              <motion.div 
+                layout
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.9 }}
+                key={product.id} 
+                onClick={() => { setSelectedProduct(product); setQuantity(1); setNotes(''); }}
+                className={`bg-white p-4 rounded-[2rem] shadow-sm border border-slate-100 flex gap-4 cursor-pointer hover:shadow-md hover:border-${themeConfig.colors.primary}/20 transition-all active:scale-[0.98] group`}
+              >
+                {product.image ? (
+                  <div className="w-24 h-24 rounded-2xl overflow-hidden shadow-sm shrink-0">
+                    <img src={product.image} alt={product.name} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" referrerPolicy="no-referrer" />
+                  </div>
+                ) : (
+                  <div className="w-24 h-24 rounded-2xl bg-slate-100 flex items-center justify-center text-slate-300 shrink-0">
+                    <UtensilsCrossed size={24} />
+                  </div>
+                )}
+                <div className="flex-1 flex flex-col justify-between py-1">
+                  <div>
+                    <h3 className={`font-bold text-lg text-${themeConfig.colors.text} leading-tight mb-1 line-clamp-1`}>{product.name}</h3>
+                    <p className={`text-xs text-${themeConfig.colors.textMuted} line-clamp-2 leading-relaxed`}>{product.description}</p>
+                  </div>
+                  <div className="flex justify-between items-end mt-2">
+                    <p className={`font-black text-lg text-${themeConfig.colors.primary}`}>
+                      {themeConfig.currency} {product.price.toFixed(2)}
+                    </p>
+                    <div className={`w-8 h-8 rounded-full bg-slate-50 flex items-center justify-center text-${themeConfig.colors.primary} group-hover:bg-${themeConfig.colors.primary} group-hover:text-white transition-colors`}>
+                      <Plus size={16} />
+                    </div>
                   </div>
                 </div>
+              </motion.div>
+            ))}
+          </AnimatePresence>
+          
+          {filteredProducts.length === 0 && (
+            <div className="text-center py-12">
+              <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-4 text-slate-400">
+                <Search size={24} />
               </div>
-            </motion.div>
-          ))}
-        </AnimatePresence>
-        
-        {filteredProducts.length === 0 && (
-          <div className="text-center py-20">
-            <div className="w-20 h-20 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-4 text-slate-400">
-              <Search size={32} />
+              <p className={`text-${themeConfig.colors.textMuted} font-medium`}>Nenhum produto encontrado.</p>
             </div>
-            <p className={`text-${themeConfig.colors.textMuted} font-medium text-lg`}>Nenhum produto encontrado.</p>
-            <p className="text-sm text-slate-400 mt-2">Tente buscar por outro termo.</p>
-          </div>
-        )}
-      </div>
+          )}
+        </div>
+      )}
 
       {/* Product Modal */}
       <AnimatePresence>
