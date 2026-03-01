@@ -35,7 +35,8 @@ CREATE TABLE tables (
   id SERIAL PRIMARY KEY,
   number INTEGER NOT NULL UNIQUE,
   "loginCode" TEXT NOT NULL UNIQUE,
-  status TEXT DEFAULT 'livre'
+  status TEXT DEFAULT 'livre',
+  active BOOLEAN DEFAULT true
 );
 
 CREATE TABLE orders (
