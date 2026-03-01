@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Socket } from 'socket.io-client';
 import { themeConfig } from '../../config/theme';
 import { Check, Clock, ChefHat, X, ChevronDown, ChevronUp, ShoppingBag } from 'lucide-react';
+import { supabase } from '../../lib/supabase';
 
 export default function Orders({ socket }: { socket: Socket | null }) {
   const [orders, setOrders] = useState<any[]>([]);
@@ -9,9 +10,39 @@ export default function Orders({ socket }: { socket: Socket | null }) {
 
   const fetchOrders = async () => {
     try {
-      const res = await fetch('/api/orders');
-      const data = await res.json();
-      setOrders(data);
+      const { data, error } = await supabase
+        .from('orders')
+        .select(`
+          *,
+          table:tables (
+            number
+          ),
+          items:order_items (
+            id,
+            quantity,
+            notes,
+            product:products (
+              name,
+              price
+            )
+          )
+        `)
+        .order('createdAt', { ascending: false });
+
+      if (error) throw error;
+
+      // Transformar os dados para o formato esperado pela UI
+      const formattedOrders = data?.map(order => ({
+        ...order,
+        tableNumber: order.table?.number,
+        items: order.items.map((item: any) => ({
+          ...item,
+          name: item.product?.name,
+          price: item.product?.price
+        }))
+      }));
+
+      setOrders(formattedOrders || []);
     } catch (error) {
       console.error('Error fetching orders:', error);
     }
@@ -20,31 +51,33 @@ export default function Orders({ socket }: { socket: Socket | null }) {
   useEffect(() => {
     fetchOrders();
 
-    if (socket) {
-      socket.on('new_order', (order) => {
-        setOrders(prev => [order, ...prev]);
-      });
-      socket.on('order_status_updated', (updatedOrder) => {
-        setOrders(prev => prev.map(o => o.id === updatedOrder.id ? updatedOrder : o));
-      });
-    }
+    // Realtime subscription for orders
+    const channel = supabase
+      .channel('admin-orders')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'orders' },
+        (payload) => {
+          console.log('Order update:', payload);
+          fetchOrders();
+        }
+      )
+      .subscribe();
 
     return () => {
-      if (socket) {
-        socket.off('new_order');
-        socket.off('order_status_updated');
-      }
+      supabase.removeChannel(channel);
     };
-  }, [socket]);
+  }, []);
 
   const updateStatus = async (id: number, status: string) => {
     try {
-      await fetch(`/api/orders/${id}/status`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status })
-      });
-      fetchOrders();
+      const { error } = await supabase
+        .from('orders')
+        .update({ status })
+        .eq('id', id);
+
+      if (error) throw error;
+      // O realtime irá atualizar a lista
     } catch (error) {
       console.error('Error updating status:', error);
     }
