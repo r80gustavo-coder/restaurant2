@@ -1,0 +1,448 @@
+import { useEffect, useState } from 'react';
+import { Socket } from 'socket.io-client';
+import { themeConfig } from '../../config/theme';
+import { Plus, Trash2, Edit2, Image as ImageIcon, PlusCircle } from 'lucide-react';
+
+export default function Products({ socket }: { socket: Socket | null }) {
+  const [products, setProducts] = useState<any[]>([]);
+  const [categories, setCategories] = useState<any[]>([]);
+  const [inventoryItems, setInventoryItems] = useState<any[]>([]);
+  
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingId, setEditingId] = useState<number | null>(null);
+  
+  const [formData, setFormData] = useState({
+    name: '',
+    description: '',
+    price: '',
+    categoryId: '',
+    image: '',
+    type: 'composed',
+    inventoryItemId: '',
+    ingredients: [] as { inventoryItemId: string, quantity: string }[]
+  });
+
+  const fetchData = async () => {
+    const [prodRes, catRes, invRes] = await Promise.all([
+      fetch('/api/products'),
+      fetch('/api/categories'),
+      fetch('/api/inventory')
+    ]);
+    const prodData = await prodRes.json();
+    const catData = await catRes.json();
+    const invData = await invRes.json();
+    
+    setProducts(prodData);
+    setCategories(catData);
+    setInventoryItems(invData);
+    
+    if (catData.length > 0 && !formData.categoryId) {
+      setFormData(prev => ({ ...prev, categoryId: catData[0].id.toString() }));
+    }
+  };
+
+  useEffect(() => {
+    fetchData();
+
+    if (socket) {
+      socket.on('product_added', fetchData);
+      socket.on('product_updated', fetchData);
+      socket.on('product_deleted', fetchData);
+      socket.on('inventory_updated', fetchData);
+    }
+
+    return () => {
+      if (socket) {
+        socket.off('product_added');
+        socket.off('product_updated');
+        socket.off('product_deleted');
+        socket.off('inventory_updated');
+      }
+    };
+  }, [socket]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      const payload = {
+        ...formData,
+        price: parseFloat(formData.price as string),
+        categoryId: parseInt(formData.categoryId),
+        inventoryItemId: formData.type === 'fixed' ? parseInt(formData.inventoryItemId) : null,
+        ingredients: formData.type === 'composed' ? formData.ingredients.map(i => ({
+          inventoryItemId: parseInt(i.inventoryItemId),
+          quantity: parseFloat(i.quantity)
+        })) : []
+      };
+
+      if (editingId) {
+        await fetch(`/api/products/${editingId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+      } else {
+        await fetch('/api/products', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+      }
+      setIsModalOpen(false);
+      setEditingId(null);
+      setFormData({ 
+        name: '', description: '', price: '', 
+        categoryId: categories[0]?.id.toString() || '', 
+        image: '', type: 'composed', inventoryItemId: '', ingredients: [] 
+      });
+      fetchData();
+    } catch (error) {
+      console.error('Error saving product:', error);
+    }
+  };
+
+  const handleEdit = (product: any) => {
+    setEditingId(product.id);
+    setFormData({
+      name: product.name,
+      description: product.description || '',
+      price: product.price.toString(),
+      categoryId: product.categoryId?.toString() || (categories[0]?.id.toString() || ''),
+      image: product.image || '',
+      type: product.type || 'composed',
+      inventoryItemId: product.inventoryItemId?.toString() || '',
+      ingredients: product.ingredients ? product.ingredients.map((i: any) => ({
+        inventoryItemId: i.inventoryItemId.toString(),
+        quantity: i.quantity.toString()
+      })) : []
+    });
+    setIsModalOpen(true);
+  };
+
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setFormData({ ...formData, image: reader.result as string });
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleDelete = async (id: number) => {
+    if (!confirm('Tem certeza que deseja excluir este produto?')) return;
+    try {
+      await fetch(`/api/products/${id}`, { method: 'DELETE' });
+      fetchData();
+    } catch (error) {
+      console.error('Error deleting product:', error);
+    }
+  };
+
+  const addIngredient = () => {
+    if (inventoryItems.length === 0) return;
+    setFormData({
+      ...formData,
+      ingredients: [...formData.ingredients, { inventoryItemId: inventoryItems[0].id.toString(), quantity: '1' }]
+    });
+  };
+
+  const updateIngredient = (index: number, field: string, value: string) => {
+    const newIngredients = [...formData.ingredients];
+    newIngredients[index] = { ...newIngredients[index], [field]: value };
+    setFormData({ ...formData, ingredients: newIngredients });
+  };
+
+  const removeIngredient = (index: number) => {
+    const newIngredients = [...formData.ingredients];
+    newIngredients.splice(index, 1);
+    setFormData({ ...formData, ingredients: newIngredients });
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="flex justify-between items-center">
+        <h2 className={`text-2xl font-bold text-${themeConfig.colors.text}`}>Produtos</h2>
+        <button 
+          onClick={() => {
+            setEditingId(null);
+            setFormData({ 
+              name: '', description: '', price: '', 
+              categoryId: categories[0]?.id.toString() || '', 
+              image: '', type: 'composed', inventoryItemId: '', ingredients: [] 
+            });
+            setIsModalOpen(true);
+          }}
+          className={`flex items-center gap-2 px-4 py-2 bg-${themeConfig.colors.primary} text-white rounded-xl hover:bg-${themeConfig.colors.primaryHover} transition-colors font-medium`}
+        >
+          <Plus size={20} /> Novo Produto
+        </button>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+        {products.map((product) => (
+          <div key={product.id} className={`bg-${themeConfig.colors.surface} rounded-2xl shadow-sm border border-slate-200 overflow-hidden group`}>
+            <div className="h-48 bg-slate-100 relative overflow-hidden">
+              {product.image ? (
+                <img src={product.image} alt={product.name} className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" referrerPolicy="no-referrer" />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center text-slate-300">
+                  <ImageIcon size={48} />
+                </div>
+              )}
+              <div className="absolute top-3 right-3 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                <button 
+                  onClick={() => handleEdit(product)}
+                  className="p-2 bg-white text-blue-500 rounded-lg shadow hover:bg-blue-50 transition-colors"
+                >
+                  <Edit2 size={16} />
+                </button>
+                <button 
+                  onClick={() => handleDelete(product.id)}
+                  className="p-2 bg-white text-red-500 rounded-lg shadow hover:bg-red-50 transition-colors"
+                >
+                  <Trash2 size={16} />
+                </button>
+              </div>
+              <span className={`absolute top-3 left-3 px-3 py-1 bg-white/90 backdrop-blur-sm text-${themeConfig.colors.text} text-xs font-bold uppercase tracking-wider rounded-full shadow-sm`}>
+                {categories.find(c => c.id === product.categoryId)?.name || 'Sem Categoria'}
+              </span>
+            </div>
+            
+            <div className="p-5">
+              <div className="flex justify-between items-start mb-2">
+                <h3 className={`font-bold text-lg text-${themeConfig.colors.text} leading-tight`}>{product.name}</h3>
+                <span className={`font-bold text-${themeConfig.colors.primary} whitespace-nowrap ml-3`}>
+                  {themeConfig.currency} {product.price.toFixed(2)}
+                </span>
+              </div>
+              <p className={`text-sm text-${themeConfig.colors.textMuted} line-clamp-2 mb-3`}>{product.description}</p>
+              
+              <div className="mt-4 pt-4 border-t border-slate-100">
+                <p className={`text-xs font-semibold text-${themeConfig.colors.text} uppercase tracking-wider mb-2`}>Ficha Técnica ({product.type === 'fixed' ? 'Fixo' : 'Composto'})</p>
+                {product.type === 'fixed' ? (
+                  <p className="text-xs text-slate-500">
+                    Estoque: {inventoryItems.find(i => i.id === product.inventoryItemId)?.name || 'Não vinculado'}
+                  </p>
+                ) : (
+                  <ul className="text-xs text-slate-500 space-y-1">
+                    {product.ingredients?.map((ing: any) => (
+                      <li key={ing.id}>• {ing.quantity} {ing.unit} {ing.name}</li>
+                    ))}
+                    {(!product.ingredients || product.ingredients.length === 0) && (
+                      <li>Nenhum ingrediente cadastrado</li>
+                    )}
+                  </ul>
+                )}
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Modal */}
+      {isModalOpen && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex justify-center items-center z-50 p-4">
+          <div className={`bg-${themeConfig.colors.surface} rounded-2xl shadow-xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[90vh]`}>
+            <div className="p-6 border-b border-slate-100 flex justify-between items-center">
+              <h3 className={`text-xl font-bold text-${themeConfig.colors.text}`}>
+                {editingId ? 'Editar Produto' : 'Novo Produto'}
+              </h3>
+              <button onClick={() => setIsModalOpen(false)} className={`text-${themeConfig.colors.textMuted} hover:bg-slate-100 p-2 rounded-xl transition-colors`}>
+                &times;
+              </button>
+            </div>
+            
+            <div className="p-6 overflow-y-auto flex-1">
+              <form id="product-form" onSubmit={handleSubmit} className="space-y-5">
+                <div className="grid grid-cols-2 gap-5">
+                  <div className="col-span-2 md:col-span-1">
+                    <label className={`block text-sm font-semibold text-${themeConfig.colors.text} mb-1.5`}>Nome</label>
+                    <input 
+                      type="text" 
+                      required
+                      value={formData.name}
+                      onChange={e => setFormData({...formData, name: e.target.value})}
+                      className={`w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-${themeConfig.colors.primary}/50 focus:border-${themeConfig.colors.primary} transition-all`}
+                    />
+                  </div>
+                  <div className="col-span-2 md:col-span-1">
+                    <label className={`block text-sm font-semibold text-${themeConfig.colors.text} mb-1.5`}>Preço ({themeConfig.currency})</label>
+                    <input 
+                      type="number" 
+                      step="0.01"
+                      required
+                      value={formData.price}
+                      onChange={e => setFormData({...formData, price: e.target.value})}
+                      className={`w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-${themeConfig.colors.primary}/50 focus:border-${themeConfig.colors.primary} transition-all`}
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-5">
+                  <div className="col-span-2 md:col-span-1">
+                    <label className={`block text-sm font-semibold text-${themeConfig.colors.text} mb-1.5`}>Categoria</label>
+                    <select 
+                      value={formData.categoryId}
+                      onChange={e => setFormData({...formData, categoryId: e.target.value})}
+                      className={`w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-${themeConfig.colors.primary}/50 focus:border-${themeConfig.colors.primary} transition-all bg-white`}
+                      required
+                    >
+                      {categories.map(cat => (
+                        <option key={cat.id} value={cat.id}>{cat.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="col-span-2 md:col-span-1">
+                    <label className={`block text-sm font-semibold text-${themeConfig.colors.text} mb-1.5`}>Imagem do Produto</label>
+                    <input 
+                      type="file" 
+                      accept="image/*"
+                      onChange={handleImageChange}
+                      className={`w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-${themeConfig.colors.primary}/50 focus:border-${themeConfig.colors.primary} transition-all bg-white file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-${themeConfig.colors.primary}/10 file:text-${themeConfig.colors.primary} hover:file:bg-${themeConfig.colors.primary}/20`}
+                    />
+                    {formData.image && (
+                      <div className="mt-2 h-20 w-20 rounded-lg overflow-hidden border border-slate-200">
+                        <img src={formData.image} alt="Preview" className="w-full h-full object-cover" />
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div>
+                  <label className={`block text-sm font-semibold text-${themeConfig.colors.text} mb-1.5`}>Descrição Curta</label>
+                  <textarea 
+                    rows={2}
+                    value={formData.description}
+                    onChange={e => setFormData({...formData, description: e.target.value})}
+                    className={`w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-${themeConfig.colors.primary}/50 focus:border-${themeConfig.colors.primary} transition-all resize-none`}
+                  />
+                </div>
+
+                <div className="border-t border-slate-200 pt-5">
+                  <h4 className="font-bold text-slate-800 mb-4">Ficha Técnica e Estoque</h4>
+                  
+                  <div className="mb-4">
+                    <label className="flex items-center gap-4">
+                      <span className="text-sm font-semibold text-slate-700">Tipo de Produto:</span>
+                      <div className="flex gap-4">
+                        <label className="flex items-center gap-2 cursor-pointer">
+                          <input 
+                            type="radio" 
+                            name="type" 
+                            value="fixed" 
+                            checked={formData.type === 'fixed'}
+                            onChange={() => setFormData({...formData, type: 'fixed'})}
+                            className={`text-${themeConfig.colors.primary} focus:ring-${themeConfig.colors.primary}`}
+                          />
+                          <span className="text-sm">Produto Fixo (Ex: Coca-Cola)</span>
+                        </label>
+                        <label className="flex items-center gap-2 cursor-pointer">
+                          <input 
+                            type="radio" 
+                            name="type" 
+                            value="composed" 
+                            checked={formData.type === 'composed'}
+                            onChange={() => setFormData({...formData, type: 'composed'})}
+                            className={`text-${themeConfig.colors.primary} focus:ring-${themeConfig.colors.primary}`}
+                          />
+                          <span className="text-sm">Composto (Ex: X-Tudo)</span>
+                        </label>
+                      </div>
+                    </label>
+                  </div>
+
+                  {formData.type === 'fixed' ? (
+                    <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
+                      <label className="block text-sm font-semibold text-slate-700 mb-2">Vincular ao item de estoque:</label>
+                      <select 
+                        required
+                        value={formData.inventoryItemId}
+                        onChange={e => setFormData({...formData, inventoryItemId: e.target.value})}
+                        className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 bg-white"
+                      >
+                        <option value="">Selecione um item...</option>
+                        {inventoryItems.map(item => (
+                          <option key={item.id} value={item.id}>{item.name} ({item.unit})</option>
+                        ))}
+                      </select>
+                    </div>
+                  ) : (
+                    <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
+                      <div className="flex justify-between items-center mb-4">
+                        <label className="block text-sm font-semibold text-slate-700">Ingredientes da Receita:</label>
+                        <button 
+                          type="button"
+                          onClick={addIngredient}
+                          className="flex items-center gap-1 text-sm text-emerald-600 font-semibold hover:text-emerald-700"
+                        >
+                          <PlusCircle size={16} /> Adicionar Ingrediente
+                        </button>
+                      </div>
+                      
+                      {formData.ingredients.length === 0 && (
+                        <p className="text-sm text-slate-500 text-center py-4">Nenhum ingrediente adicionado.</p>
+                      )}
+
+                      <div className="space-y-3">
+                        {formData.ingredients.map((ing, index) => (
+                          <div key={index} className="flex gap-3 items-center">
+                            <select 
+                              required
+                              value={ing.inventoryItemId}
+                              onChange={e => updateIngredient(index, 'inventoryItemId', e.target.value)}
+                              className="flex-1 px-3 py-2 rounded-lg border border-slate-200 focus:ring-2 focus:ring-emerald-500 bg-white text-sm"
+                            >
+                              {inventoryItems.map(item => (
+                                <option key={item.id} value={item.id}>{item.name} ({item.unit})</option>
+                              ))}
+                            </select>
+                            <input 
+                              type="number"
+                              required
+                              min="0.01"
+                              step="0.01"
+                              placeholder="Qtd"
+                              value={ing.quantity}
+                              onChange={e => updateIngredient(index, 'quantity', e.target.value)}
+                              className="w-24 px-3 py-2 rounded-lg border border-slate-200 focus:ring-2 focus:ring-emerald-500 text-sm"
+                            />
+                            <button 
+                              type="button"
+                              onClick={() => removeIngredient(index)}
+                              className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </form>
+            </div>
+            
+            <div className="p-6 border-t border-slate-100 bg-slate-50 flex justify-end gap-3">
+              <button 
+                type="button" 
+                onClick={() => setIsModalOpen(false)}
+                className={`px-6 py-2.5 rounded-xl font-medium text-${themeConfig.colors.textMuted} hover:bg-slate-200 transition-colors`}
+              >
+                Cancelar
+              </button>
+              <button 
+                type="submit" 
+                form="product-form"
+                className={`px-6 py-2.5 rounded-xl font-medium bg-${themeConfig.colors.primary} text-white hover:bg-${themeConfig.colors.primaryHover} transition-colors shadow-sm`}
+              >
+                Salvar Produto
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
