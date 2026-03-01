@@ -1,253 +1,402 @@
-import { useEffect, useState } from 'react';
+import { useState, useEffect } from 'react';
 import { themeConfig } from '../../config/theme';
-import { DollarSign, Search, CheckCircle2 } from 'lucide-react';
+import { DollarSign, CreditCard, Banknote, QrCode, User, Plus, Search, ShoppingBag, CheckCircle2 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
+import { format } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
 
 export default function Checkout() {
   const [tables, setTables] = useState<any[]>([]);
+  const [selectedTable, setSelectedTable] = useState<any | null>(null);
   const [orders, setOrders] = useState<any[]>([]);
-  const [selectedTable, setSelectedTable] = useState<any>(null);
+  const [loading, setLoading] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState('credit');
+  
+  // New states for enhancements
+  const [customers, setCustomers] = useState<any[]>([]);
+  const [products, setProducts] = useState<any[]>([]);
+  const [selectedCustomer, setSelectedCustomer] = useState<string>('');
+  const [isAddingItem, setIsAddingItem] = useState(false);
+  const [itemSearch, setItemSearch] = useState('');
+  const [selectedProductToAdd, setSelectedProductToAdd] = useState<any | null>(null);
+  const [itemQuantity, setItemQuantity] = useState(1);
 
   const fetchData = async () => {
     try {
-      const [tablesRes, ordersRes] = await Promise.all([
+      const [tablesRes, customersRes, productsRes] = await Promise.all([
         supabase.from('tables').select('*').order('number'),
-        supabase.from('orders').select(`
-          *,
-          items:order_items (
-            id,
-            quantity,
-            notes,
-            product:products (
-              name,
-              price
-            )
-          )
-        `).neq('status', 'cancelled') // Fetch active orders
+        supabase.from('customers').select('*').order('name'),
+        supabase.from('products').select('*').order('name')
       ]);
 
       if (tablesRes.error) throw tablesRes.error;
-      if (ordersRes.error) throw ordersRes.error;
-      
-      // Transform orders to include flattened items
-      const formattedOrders = ordersRes.data?.map(order => ({
-        ...order,
-        items: order.items.map((item: any) => ({
-          ...item,
-          name: item.product?.name,
-          price: item.product?.price
-        }))
-      })) || [];
-
       setTables(tablesRes.data || []);
-      setOrders(formattedOrders);
+      setCustomers(customersRes.data || []);
+      setProducts(productsRes.data || []);
     } catch (error) {
-      console.error('Error fetching checkout data:', error);
+      console.error('Error fetching data:', error);
     }
   };
 
   useEffect(() => {
     fetchData();
 
-    const tablesChannel = supabase
-      .channel('checkout-tables')
+    const channel = supabase
+      .channel('checkout-updates')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'tables' }, fetchData)
-      .subscribe();
-
-    const ordersChannel = supabase
-      .channel('checkout-orders')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, fetchData)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, () => {
+        if (selectedTable) fetchTableOrders(selectedTable.id);
+      })
       .subscribe();
 
     return () => {
-      supabase.removeChannel(tablesChannel);
-      supabase.removeChannel(ordersChannel);
+      supabase.removeChannel(channel);
     };
-  }, []);
+  }, [selectedTable]);
+
+  const fetchTableOrders = async (tableId: number) => {
+    try {
+      const { data, error } = await supabase
+        .from('orders')
+        .select(`
+          *,
+          items:order_items (
+            *,
+            product:products (*)
+          )
+        `)
+        .eq('tableId', tableId)
+        .neq('paymentStatus', 'paid')
+        .neq('status', 'cancelled');
+
+      if (error) throw error;
+      setOrders(data || []);
+    } catch (error) {
+      console.error('Error fetching orders:', error);
+    }
+  };
+
+  const handleTableSelect = (table: any) => {
+    setSelectedTable(table);
+    fetchTableOrders(table.id);
+    setSelectedCustomer('');
+    setIsAddingItem(false);
+  };
+
+  const total = orders.reduce((sum, order) => sum + order.total, 0);
+
+  const handleAddItem = async () => {
+    if (!selectedProductToAdd || !selectedTable) return;
+
+    try {
+      // Find an open order to add to, or create a new one
+      let targetOrder = orders[0];
+      
+      if (!targetOrder) {
+        const { data: newOrder, error: createError } = await supabase
+          .from('orders')
+          .insert([{
+            tableId: selectedTable.id,
+            status: 'pending',
+            paymentStatus: 'pending',
+            total: 0
+          }])
+          .select()
+          .single();
+        
+        if (createError) throw createError;
+        targetOrder = newOrder;
+      }
+
+      // Add item
+      const { error: itemError } = await supabase
+        .from('order_items')
+        .insert([{
+          orderId: targetOrder.id,
+          productId: selectedProductToAdd.id,
+          quantity: itemQuantity,
+          notes: 'Adicionado pelo caixa'
+        }]);
+
+      if (itemError) throw itemError;
+
+      // Update order total
+      const newTotal = targetOrder.total + (selectedProductToAdd.price * itemQuantity);
+      await supabase
+        .from('orders')
+        .update({ total: newTotal })
+        .eq('id', targetOrder.id);
+
+      // Reset selection
+      setSelectedProductToAdd(null);
+      setItemQuantity(1);
+      setItemSearch('');
+      setIsAddingItem(false);
+      fetchTableOrders(selectedTable.id);
+
+    } catch (error) {
+      console.error('Error adding item:', error);
+      alert('Erro ao adicionar item');
+    }
+  };
 
   const handlePay = async () => {
     if (!selectedTable) return;
-    
+    setLoading(true);
+
     try {
-      // 1. Get all pending orders for this table
-      const tableOrders = orders.filter(o => 
-        o.tableId === selectedTable.id && 
-        (o.paymentStatus === 'pending' || o.paymentStatus === null) && 
-        o.status !== 'cancelled'
+      // Update all orders to paid and assign customer if selected
+      const updates = orders.map(order => 
+        supabase
+          .from('orders')
+          .update({ 
+            paymentStatus: 'paid', 
+            status: 'paid',
+            customerId: selectedCustomer ? parseInt(selectedCustomer) : null 
+          })
+          .eq('id', order.id)
       );
-      
-      if (tableOrders.length === 0) return;
 
-      const orderIds = tableOrders.map(o => o.id);
+      await Promise.all(updates);
 
-      // 2. Update orders to paid
-      const { error: updateOrdersError } = await supabase
-        .from('orders')
-        .update({ 
-          paymentStatus: 'paid', 
-          paymentMethod: paymentMethod,
-          status: 'delivered' // Assuming payment means the service is complete
-        })
-        .in('id', orderIds);
-
-      if (updateOrdersError) throw updateOrdersError;
-
-      // 3. Set table to free
-      const { error: updateTableError } = await supabase
+      // Free the table
+      await supabase
         .from('tables')
         .update({ status: 'livre' })
         .eq('id', selectedTable.id);
 
-      if (updateTableError) throw updateTableError;
-      
+      alert('Pagamento confirmado e mesa liberada!');
       setSelectedTable(null);
-      fetchData(); // Force refresh
+      fetchData();
     } catch (error) {
       console.error('Error processing payment:', error);
       alert('Erro ao processar pagamento');
+    } finally {
+      setLoading(false);
     }
   };
 
-  const occupiedTables = tables.filter(t => t.status === 'ocupada');
-  const tableOrders = selectedTable 
-    ? orders.filter(o => o.tableId === selectedTable.id && (o.paymentStatus === 'pending' || o.paymentStatus === null) && o.status !== 'cancelled')
-    : [];
-    
-  const totalToPay = tableOrders.reduce((sum, order) => sum + order.total, 0);
+  const filteredProducts = products.filter(p => 
+    p.name.toLowerCase().includes(itemSearch.toLowerCase())
+  );
 
   return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <h2 className={`text-2xl font-bold text-${themeConfig.colors.text}`}>Caixa / Pagamentos</h2>
+    <div className="h-[calc(100vh-2rem)] flex gap-6">
+      {/* Tables Grid */}
+      <div className="flex-1 overflow-y-auto pr-2">
+        <h2 className={`text-2xl font-bold text-${themeConfig.colors.text} mb-6`}>Mesas</h2>
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+          {tables.map((table) => (
+            <button
+              key={table.id}
+              onClick={() => handleTableSelect(table)}
+              className={`p-6 rounded-2xl border-2 transition-all relative ${
+                selectedTable?.id === table.id
+                  ? `border-${themeConfig.colors.primary} bg-${themeConfig.colors.primary}/5`
+                  : table.status === 'ocupada'
+                  ? 'border-orange-200 bg-orange-50 hover:border-orange-300'
+                  : 'border-slate-100 bg-white hover:border-slate-200'
+              }`}
+            >
+              <div className="flex justify-between items-start mb-2">
+                <span className={`text-lg font-bold ${
+                  selectedTable?.id === table.id ? `text-${themeConfig.colors.primary}` : 'text-slate-700'
+                }`}>
+                  Mesa {table.number}
+                </span>
+                <span className={`w-3 h-3 rounded-full ${
+                  table.status === 'ocupada' ? 'bg-orange-500' : 'bg-emerald-500'
+                }`} />
+              </div>
+              <p className="text-sm text-slate-500 font-medium">
+                {table.status === 'ocupada' ? 'Ocupada' : 'Livre'}
+              </p>
+            </button>
+          ))}
+        </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Lista de Mesas Ocupadas */}
-        <div className={`bg-${themeConfig.colors.surface} rounded-2xl shadow-sm border border-slate-200 overflow-hidden lg:col-span-1`}>
-          <div className="p-4 border-b border-slate-100 bg-slate-50">
-            <h3 className="font-bold text-slate-700">Mesas Ocupadas</h3>
-          </div>
-          <div className="p-4 space-y-3">
-            {occupiedTables.map(table => {
-              const tOrders = orders.filter(o => o.tableId === table.id && o.paymentStatus === 'pending' && o.status !== 'cancelled');
-              const tTotal = tOrders.reduce((sum, o) => sum + o.total, 0);
-              
-              return (
-                <div 
-                  key={table.id}
-                  onClick={() => setSelectedTable(table)}
-                  className={`p-4 rounded-xl border cursor-pointer transition-all ${
-                    selectedTable?.id === table.id 
-                      ? `border-${themeConfig.colors.primary} bg-${themeConfig.colors.primary}/5` 
-                      : 'border-slate-200 hover:border-slate-300'
-                  }`}
-                >
-                  <div className="flex justify-between items-center mb-2">
-                    <span className="font-bold text-lg text-slate-800">Mesa {table.number}</span>
-                    <span className="text-sm font-semibold text-orange-600 bg-orange-50 px-2 py-1 rounded-md">
-                      {tOrders.length} pedidos
-                    </span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-slate-500">Total a pagar:</span>
-                    <span className="font-bold text-emerald-600">{themeConfig.currency} {tTotal.toFixed(2)}</span>
-                  </div>
-                </div>
-              );
-            })}
-            
-            {occupiedTables.length === 0 && (
-              <div className="text-center py-8 text-slate-500">
-                Nenhuma mesa ocupada no momento.
-              </div>
-            )}
-          </div>
-        </div>
+      {/* Checkout Sidebar */}
+      <div className={`w-96 bg-${themeConfig.colors.surface} rounded-3xl shadow-xl border border-slate-100 flex flex-col overflow-hidden`}>
+        {selectedTable ? (
+          <>
+            <div className="p-6 border-b border-slate-100 bg-slate-50/50">
+              <h3 className={`text-xl font-black text-${themeConfig.colors.text} mb-1`}>
+                Mesa {selectedTable.number}
+              </h3>
+              <p className={`text-sm text-${themeConfig.colors.textMuted}`}>Resumo do Pedido</p>
+            </div>
 
-        {/* Detalhes do Pagamento */}
-        <div className={`bg-${themeConfig.colors.surface} rounded-2xl shadow-sm border border-slate-200 overflow-hidden lg:col-span-2 flex flex-col`}>
-          {selectedTable ? (
-            <>
-              <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50">
-                <h3 className="text-xl font-bold text-slate-800">Fechamento - Mesa {selectedTable.number}</h3>
-                <span className="px-3 py-1 bg-orange-100 text-orange-700 text-xs font-bold uppercase tracking-wider rounded-full">
-                  Aguardando Pagamento
+            <div className="flex-1 overflow-y-auto p-6">
+              {/* Customer Selection */}
+              <div className="mb-6">
+                <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Cliente</label>
+                <div className="relative">
+                  <select
+                    value={selectedCustomer}
+                    onChange={(e) => setSelectedCustomer(e.target.value)}
+                    className="w-full p-3 pl-10 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500 appearance-none"
+                  >
+                    <option value="">Cliente não identificado</option>
+                    {customers.map(c => (
+                      <option key={c.id} value={c.id}>{c.name}</option>
+                    ))}
+                  </select>
+                  <User size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                </div>
+              </div>
+
+              {/* Order Items */}
+              <div className="space-y-6">
+                {orders.map((order) => (
+                  <div key={order.id} className="border-b border-slate-100 pb-4 last:border-0">
+                    <div className="flex justify-between items-center mb-3">
+                      <span className="text-xs font-bold text-slate-400 bg-slate-100 px-2 py-1 rounded">
+                        #{order.id}
+                      </span>
+                      <span className="text-xs font-medium text-slate-400">
+                        {format(new Date(order.createdAt), 'HH:mm', { locale: ptBR })}
+                      </span>
+                    </div>
+                    <div className="space-y-3">
+                      {order.items?.map((item: any) => (
+                        <div key={item.id} className="flex justify-between items-start text-sm">
+                          <div>
+                            <span className="font-bold text-slate-700 mr-2">{item.quantity}x</span>
+                            <span className="text-slate-600">{item.product?.name}</span>
+                          </div>
+                          <span className="font-medium text-slate-900">
+                            {themeConfig.currency} {(item.product?.price * item.quantity).toFixed(2)}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+                {orders.length === 0 && (
+                  <p className="text-center text-slate-400 py-4 italic">Nenhum pedido realizado</p>
+                )}
+              </div>
+
+              {/* Add Item Section */}
+              <div className="mt-6 pt-6 border-t border-slate-100">
+                {!isAddingItem ? (
+                  <button 
+                    onClick={() => setIsAddingItem(true)}
+                    className={`w-full py-3 border-2 border-dashed border-${themeConfig.colors.primary}/30 text-${themeConfig.colors.primary} rounded-xl font-bold text-sm hover:bg-${themeConfig.colors.primary}/5 transition-colors flex items-center justify-center gap-2`}
+                  >
+                    <Plus size={18} /> Adicionar Item Extra
+                  </button>
+                ) : (
+                  <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 animate-in fade-in slide-in-from-top-2">
+                    <div className="flex justify-between items-center mb-3">
+                      <h4 className="font-bold text-sm text-slate-700">Adicionar Item</h4>
+                      <button onClick={() => setIsAddingItem(false)} className="text-slate-400 hover:text-slate-600">
+                        &times;
+                      </button>
+                    </div>
+                    
+                    <div className="space-y-3">
+                      <div className="relative">
+                        <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                        <input 
+                          type="text" 
+                          placeholder="Buscar produto..." 
+                          value={itemSearch}
+                          onChange={(e) => setItemSearch(e.target.value)}
+                          className="w-full pl-9 pr-3 py-2 text-sm rounded-lg border border-slate-200 focus:outline-none focus:border-emerald-500"
+                        />
+                      </div>
+                      
+                      {itemSearch && (
+                        <div className="max-h-32 overflow-y-auto bg-white border border-slate-200 rounded-lg">
+                          {filteredProducts.map(p => (
+                            <button
+                              key={p.id}
+                              onClick={() => { setSelectedProductToAdd(p); setItemSearch(''); }}
+                              className="w-full text-left px-3 py-2 text-sm hover:bg-slate-50 border-b border-slate-50 last:border-0 flex justify-between"
+                            >
+                              <span>{p.name}</span>
+                              <span className="font-medium">{themeConfig.currency} {p.price.toFixed(2)}</span>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+
+                      {selectedProductToAdd && (
+                        <div className="bg-white p-3 rounded-lg border border-emerald-100">
+                          <div className="flex justify-between items-center mb-2">
+                            <span className="text-sm font-medium text-emerald-700">{selectedProductToAdd.name}</span>
+                            <button onClick={() => setSelectedProductToAdd(null)} className="text-xs text-red-400 hover:text-red-600">Remover</button>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <input 
+                              type="number" 
+                              min="1" 
+                              value={itemQuantity}
+                              onChange={(e) => setItemQuantity(parseInt(e.target.value))}
+                              className="w-16 px-2 py-1 text-sm border border-slate-200 rounded"
+                            />
+                            <button 
+                              onClick={handleAddItem}
+                              className={`flex-1 py-1 bg-${themeConfig.colors.primary} text-white text-sm font-bold rounded hover:bg-${themeConfig.colors.primaryHover}`}
+                            >
+                              Adicionar
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="p-6 bg-white border-t border-slate-100 shadow-[0_-10px_40px_-15px_rgba(0,0,0,0.05)]">
+              <div className="flex justify-between items-end mb-6">
+                <span className="text-slate-500 font-medium">Total a Pagar</span>
+                <span className={`text-3xl font-black text-${themeConfig.colors.primary}`}>
+                  {themeConfig.currency} {total.toFixed(2)}
                 </span>
               </div>
-              
-              <div className="p-6 flex-1 overflow-y-auto">
-                <h4 className="font-semibold text-slate-700 mb-4">Resumo dos Pedidos</h4>
-                <div className="space-y-4">
-                  {tableOrders.map(order => (
-                    <div key={order.id} className="border border-slate-100 rounded-xl p-4 bg-white">
-                      <div className="flex justify-between items-center mb-3 border-b border-slate-50 pb-2">
-                        <span className="font-bold text-slate-600 text-sm">Pedido #{order.id}</span>
-                        <span className="font-bold text-slate-800">{themeConfig.currency} {order.total.toFixed(2)}</span>
-                      </div>
-                      <div className="space-y-2">
-                        {order.items.map((item: any) => (
-                          <div key={item.id} className="flex justify-between text-sm">
-                            <span className="text-slate-600">{item.quantity}x {item.name}</span>
-                            <span className="text-slate-500">{themeConfig.currency} {(item.price * item.quantity).toFixed(2)}</span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  ))}
-                  
-                  {tableOrders.length === 0 && (
-                    <p className="text-slate-500 text-center py-4">Nenhum pedido pendente para esta mesa.</p>
-                  )}
-                </div>
+
+              <div className="grid grid-cols-3 gap-2 mb-6">
+                {[
+                  { id: 'credit', icon: CreditCard, label: 'Crédito' },
+                  { id: 'debit', icon: CreditCard, label: 'Débito' },
+                  { id: 'cash', icon: Banknote, label: 'Dinheiro' },
+                  { id: 'pix', icon: QrCode, label: 'PIX' },
+                ].map((method) => (
+                  <button
+                    key={method.id}
+                    onClick={() => setPaymentMethod(method.id)}
+                    className={`flex flex-col items-center justify-center p-3 rounded-xl border transition-all ${
+                      paymentMethod === method.id
+                        ? `border-${themeConfig.colors.primary} bg-${themeConfig.colors.primary}/5 text-${themeConfig.colors.primary}`
+                        : 'border-slate-100 text-slate-400 hover:border-slate-200'
+                    }`}
+                  >
+                    <method.icon size={20} className="mb-1" />
+                    <span className="text-[10px] font-bold uppercase">{method.label}</span>
+                  </button>
+                ))}
               </div>
-              
-              <div className="p-6 border-t border-slate-200 bg-slate-50">
-                <div className="flex justify-between items-center mb-6">
-                  <span className="text-lg font-semibold text-slate-600">Total a Pagar</span>
-                  <span className="text-3xl font-black text-emerald-600">{themeConfig.currency} {totalToPay.toFixed(2)}</span>
-                </div>
-                
-                <div className="mb-6">
-                  <label className="block text-sm font-semibold text-slate-700 mb-3">Forma de Pagamento</label>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                    {[
-                      { id: 'credit', label: 'Crédito' },
-                      { id: 'debit', label: 'Débito' },
-                      { id: 'pix', label: 'PIX' },
-                      { id: 'cash', label: 'Dinheiro' }
-                    ].map(method => (
-                      <button
-                        key={method.id}
-                        onClick={() => setPaymentMethod(method.id)}
-                        className={`py-3 px-4 rounded-xl font-semibold text-sm transition-all border ${
-                          paymentMethod === method.id 
-                            ? `border-${themeConfig.colors.primary} bg-${themeConfig.colors.primary}/10 text-${themeConfig.colors.primary}` 
-                            : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'
-                        }`}
-                      >
-                        {method.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-                
-                <button 
-                  onClick={handlePay}
-                  disabled={totalToPay === 0}
-                  className={`w-full py-4 bg-${themeConfig.colors.primary} text-white font-bold text-lg rounded-xl shadow-lg shadow-${themeConfig.colors.primary}/30 disabled:opacity-50 disabled:cursor-not-allowed active:scale-[0.98] transition-all flex items-center justify-center gap-2`}
-                >
-                  <CheckCircle2 size={24} /> Confirmar Pagamento e Liberar Mesa
-                </button>
-              </div>
-            </>
-          ) : (
-            <div className="flex-1 flex flex-col items-center justify-center text-slate-400 p-12">
-              <DollarSign size={64} className="mb-4 opacity-20" />
-              <p className="text-lg font-medium">Selecione uma mesa para realizar o fechamento</p>
+
+              <button
+                onClick={handlePay}
+                disabled={loading || orders.length === 0}
+                className={`w-full py-4 bg-${themeConfig.colors.primary} text-white font-black text-lg rounded-2xl shadow-lg shadow-${themeConfig.colors.primary}/30 active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2`}
+              >
+                {loading ? 'Processando...' : 'Confirmar Pagamento'}
+              </button>
             </div>
-          )}
-        </div>
+          </>
+        ) : (
+          <div className="flex-1 flex flex-col items-center justify-center text-slate-300 p-8 text-center">
+            <ShoppingBag size={48} className="mb-4 opacity-50" />
+            <p className="font-medium">Selecione uma mesa para<br/>iniciar o checkout</p>
+          </div>
+        )}
       </div>
     </div>
   );

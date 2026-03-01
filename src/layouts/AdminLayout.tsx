@@ -99,6 +99,7 @@ export default function AdminLayout() {
     { path: '/admin/checkout', icon: DollarSign, label: 'Caixa' },
     { path: '/admin/products', icon: Package, label: 'Produtos' },
     { path: '/admin/categories', icon: Tag, label: 'Categorias' },
+    { path: '/admin/customers', icon: Users, label: 'Clientes' },
     { path: '/admin/inventory', icon: Box, label: 'Estoque' },
     { path: '/admin/tables', icon: Users, label: 'Mesas' },
     { path: '/admin/reports', icon: FileText, label: 'Relatórios' },
@@ -108,21 +109,6 @@ export default function AdminLayout() {
 
   const markAllAsRead = () => {
     setNotifications(prev => prev.map(n => ({ ...n, read: true })));
-  };
-
-  const testNotification = () => {
-    const newNotification = {
-      id: Date.now(),
-      title: 'Teste de Notificação',
-      message: 'Esta é uma notificação de teste para verificar o som.',
-      time: new Date(),
-      type: 'info',
-      read: false
-    };
-    setNotifications(prev => [newNotification, ...prev]);
-    if (audioRef.current) {
-      audioRef.current.play().catch(e => console.error('Error playing sound:', e));
-    }
   };
 
   return (
@@ -181,13 +167,6 @@ export default function AdminLayout() {
               </span>
             )}
             
-            <button 
-              onClick={testNotification}
-              className="px-3 py-1 text-xs font-medium text-slate-500 hover:bg-slate-100 rounded-lg border border-slate-200"
-            >
-              Testar Som
-            </button>
-
             <button 
               onClick={() => {
                 setShowNotifications(!showNotifications);

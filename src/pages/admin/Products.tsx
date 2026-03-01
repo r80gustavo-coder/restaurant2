@@ -18,6 +18,7 @@ export default function Products() {
     categoryId: '',
     image: '',
     type: 'composed',
+    visible: true,
     inventoryItemId: '',
     ingredients: [] as { inventoryItemId: string, quantity: string }[]
   });
@@ -102,6 +103,7 @@ export default function Products() {
         categoryId: parseInt(formData.categoryId),
         image: formData.image,
         type: formData.type,
+        visible: formData.visible,
         inventoryItemId: formData.type === 'fixed' ? parseInt(formData.inventoryItemId) : null
       };
 
@@ -148,7 +150,7 @@ export default function Products() {
       setFormData({ 
         name: '', description: '', price: '', 
         categoryId: categories[0]?.id.toString() || '', 
-        image: '', type: 'composed', inventoryItemId: '', ingredients: [] 
+        image: '', type: 'composed', visible: true, inventoryItemId: '', ingredients: [] 
       });
       fetchData();
     } catch (error) {
@@ -166,6 +168,7 @@ export default function Products() {
       categoryId: product.categoryId?.toString() || (categories[0]?.id.toString() || ''),
       image: product.image || '',
       type: product.type || 'composed',
+      visible: product.visible !== false,
       inventoryItemId: product.inventoryItemId?.toString() || '',
       ingredients: product.ingredients ? product.ingredients.map((i: any) => ({
         inventoryItemId: i.inventoryItemId.toString(),
@@ -279,7 +282,7 @@ export default function Products() {
             setFormData({ 
               name: '', description: '', price: '', 
               categoryId: categories[0]?.id.toString() || '', 
-              image: '', type: 'composed', inventoryItemId: '', ingredients: [] 
+              image: '', type: 'composed', visible: true, inventoryItemId: '', ingredients: [] 
             });
             setIsModalOpen(true);
           }}
@@ -289,65 +292,90 @@ export default function Products() {
         </button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-        {products.map((product) => (
-          <div key={product.id} className={`bg-${themeConfig.colors.surface} rounded-2xl shadow-sm border border-slate-200 overflow-hidden group`}>
-            <div className="h-48 bg-slate-100 relative overflow-hidden">
-              {product.image ? (
-                <img src={product.image} alt={product.name} className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" referrerPolicy="no-referrer" />
-              ) : (
-                <div className="w-full h-full flex items-center justify-center text-slate-300">
-                  <ImageIcon size={48} />
-                </div>
-              )}
-              <div className="absolute top-3 right-3 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                <button 
-                  onClick={() => handleEdit(product)}
-                  className="p-2 bg-white text-blue-500 rounded-lg shadow hover:bg-blue-50 transition-colors"
-                >
-                  <Edit2 size={16} />
-                </button>
-                <button 
-                  onClick={() => handleDelete(product.id)}
-                  className="p-2 bg-white text-red-500 rounded-lg shadow hover:bg-red-50 transition-colors"
-                >
-                  <Trash2 size={16} />
-                </button>
+      <div className="space-y-8">
+        {categories.map(category => {
+          const categoryProducts = products.filter(p => p.categoryId === category.id);
+          if (categoryProducts.length === 0) return null;
+
+          return (
+            <div key={category.id}>
+              <h3 className={`text-xl font-bold text-${themeConfig.colors.text} mb-4 flex items-center gap-2`}>
+                {category.name}
+                <span className="text-sm font-normal text-slate-400">({categoryProducts.length})</span>
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                {categoryProducts.map((product) => (
+                  <div key={product.id} className={`bg-${themeConfig.colors.surface} rounded-2xl shadow-sm border border-slate-200 overflow-hidden group ${!product.visible ? 'opacity-75' : ''}`}>
+                    <div className="h-48 bg-slate-100 relative overflow-hidden">
+                      {product.image ? (
+                        <img src={product.image} alt={product.name} className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" referrerPolicy="no-referrer" />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center text-slate-300">
+                          <ImageIcon size={48} />
+                        </div>
+                      )}
+                      
+                      {!product.visible && (
+                        <div className="absolute inset-0 bg-black/10 flex items-center justify-center backdrop-blur-[1px]">
+                          <span className="bg-slate-800 text-white px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider">Oculto</span>
+                        </div>
+                      )}
+
+                      <div className="absolute top-3 right-3 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button 
+                          onClick={() => handleEdit(product)}
+                          className="p-2 bg-white text-blue-500 rounded-lg shadow hover:bg-blue-50 transition-colors"
+                        >
+                          <Edit2 size={16} />
+                        </button>
+                        <button 
+                          onClick={() => handleDelete(product.id)}
+                          className="p-2 bg-white text-red-500 rounded-lg shadow hover:bg-red-50 transition-colors"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
+                    </div>
+                    
+                    <div className="p-5">
+                      <div className="flex justify-between items-start mb-2">
+                        <h3 className={`font-bold text-lg text-${themeConfig.colors.text} leading-tight`}>{product.name}</h3>
+                        <span className={`font-bold text-${themeConfig.colors.primary} whitespace-nowrap ml-3`}>
+                          {themeConfig.currency} {product.price.toFixed(2)}
+                        </span>
+                      </div>
+                      <p className={`text-sm text-${themeConfig.colors.textMuted} line-clamp-2 mb-3`}>{product.description}</p>
+                      
+                      <div className="mt-4 pt-4 border-t border-slate-100">
+                        <p className={`text-xs font-semibold text-${themeConfig.colors.text} uppercase tracking-wider mb-2`}>Ficha Técnica ({product.type === 'fixed' ? 'Fixo' : 'Composto'})</p>
+                        {product.type === 'fixed' ? (
+                          <p className="text-xs text-slate-500">
+                            Estoque: {inventoryItems.find(i => i.id === product.inventoryItemId)?.name || 'Não vinculado'}
+                          </p>
+                        ) : (
+                          <ul className="text-xs text-slate-500 space-y-1">
+                            {product.ingredients?.map((ing: any) => (
+                              <li key={ing.id}>• {ing.quantity} {ing.unit} {ing.name}</li>
+                            ))}
+                            {(!product.ingredients || product.ingredients.length === 0) && (
+                              <li>Nenhum ingrediente cadastrado</li>
+                            )}
+                          </ul>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
               </div>
-              <span className={`absolute top-3 left-3 px-3 py-1 bg-white/90 backdrop-blur-sm text-${themeConfig.colors.text} text-xs font-bold uppercase tracking-wider rounded-full shadow-sm`}>
-                {categories.find(c => c.id === product.categoryId)?.name || 'Sem Categoria'}
-              </span>
             </div>
-            
-            <div className="p-5">
-              <div className="flex justify-between items-start mb-2">
-                <h3 className={`font-bold text-lg text-${themeConfig.colors.text} leading-tight`}>{product.name}</h3>
-                <span className={`font-bold text-${themeConfig.colors.primary} whitespace-nowrap ml-3`}>
-                  {themeConfig.currency} {product.price.toFixed(2)}
-                </span>
-              </div>
-              <p className={`text-sm text-${themeConfig.colors.textMuted} line-clamp-2 mb-3`}>{product.description}</p>
-              
-              <div className="mt-4 pt-4 border-t border-slate-100">
-                <p className={`text-xs font-semibold text-${themeConfig.colors.text} uppercase tracking-wider mb-2`}>Ficha Técnica ({product.type === 'fixed' ? 'Fixo' : 'Composto'})</p>
-                {product.type === 'fixed' ? (
-                  <p className="text-xs text-slate-500">
-                    Estoque: {inventoryItems.find(i => i.id === product.inventoryItemId)?.name || 'Não vinculado'}
-                  </p>
-                ) : (
-                  <ul className="text-xs text-slate-500 space-y-1">
-                    {product.ingredients?.map((ing: any) => (
-                      <li key={ing.id}>• {ing.quantity} {ing.unit} {ing.name}</li>
-                    ))}
-                    {(!product.ingredients || product.ingredients.length === 0) && (
-                      <li>Nenhum ingrediente cadastrado</li>
-                    )}
-                  </ul>
-                )}
-              </div>
-            </div>
-          </div>
-        ))}
+          );
+        })}
+        
+        {products.length === 0 && (
+           <div className="text-center py-12">
+             <p className="text-slate-500">Nenhum produto cadastrado.</p>
+           </div>
+        )}
       </div>
 
       {/* Modal */}
@@ -427,6 +455,24 @@ export default function Products() {
                     onChange={e => setFormData({...formData, description: e.target.value})}
                     className={`w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-${themeConfig.colors.primary}/50 focus:border-${themeConfig.colors.primary} transition-all resize-none`}
                   />
+                </div>
+
+                <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-xl border border-slate-100">
+                  <div className="flex-1">
+                    <span className="block text-sm font-semibold text-slate-700">Visibilidade</span>
+                    <span className="block text-xs text-slate-500">
+                      {formData.visible ? 'Visível no cardápio do cliente' : 'Oculto (apenas uso interno)'}
+                    </span>
+                  </div>
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input 
+                      type="checkbox" 
+                      checked={formData.visible}
+                      onChange={e => setFormData({...formData, visible: e.target.checked})}
+                      className="sr-only peer" 
+                    />
+                    <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-emerald-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-600"></div>
+                  </label>
                 </div>
 
                 <div className="border-t border-slate-200 pt-5">

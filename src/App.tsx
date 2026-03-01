@@ -9,6 +9,7 @@ import Dashboard from './pages/admin/Dashboard';
 import Orders from './pages/admin/Orders';
 import Products from './pages/admin/Products';
 import Categories from './pages/admin/Categories';
+import Customers from './pages/admin/Customers';
 import Inventory from './pages/admin/Inventory';
 import Checkout from './pages/admin/Checkout';
 import Reports from './pages/admin/Reports';
@@ -33,6 +34,7 @@ export default function App() {
           <Route path="orders" element={<Orders />} />
           <Route path="products" element={<Products />} />
           <Route path="categories" element={<Categories />} />
+          <Route path="customers" element={<Customers />} />
           <Route path="inventory" element={<Inventory />} />
           <Route path="tables" element={<Tables />} />
           <Route path="checkout" element={<Checkout />} />

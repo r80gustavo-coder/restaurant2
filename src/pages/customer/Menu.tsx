@@ -67,7 +67,8 @@ export default function Menu() {
     const matchesCategory = activeCategory ? p.categoryId === parseInt(activeCategory) : true;
     const matchesSearch = p.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
                           (p.description && p.description.toLowerCase().includes(searchQuery.toLowerCase()));
-    return matchesCategory && matchesSearch;
+    // Only show visible products
+    return matchesCategory && matchesSearch && p.visible !== false;
   });
 
   // If search is active, we show products regardless of category selection
