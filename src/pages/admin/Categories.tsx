@@ -1,10 +1,9 @@
 import { useEffect, useState } from 'react';
-import { Socket } from 'socket.io-client';
 import { themeConfig } from '../../config/theme';
 import { Plus, Trash2, Edit2, Tag } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 
-export default function Categories({ socket }: { socket: Socket | null }) {
+export default function Categories() {
   const [categories, setCategories] = useState<any[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [formData, setFormData] = useState({ name: '', icon: 'tag' });

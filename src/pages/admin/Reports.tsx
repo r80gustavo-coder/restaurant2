@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
-import { Socket } from 'socket.io-client';
 import { themeConfig } from '../../config/theme';
 import { FileText, Filter, Download } from 'lucide-react';
+import { supabase } from '../../lib/supabase';
 
-export default function Reports({ socket }: { socket: Socket | null }) {
+export default function Reports() {
   const [orders, setOrders] = useState<any[]>([]);
   const [filters, setFilters] = useState({
     startDate: '',
@@ -13,10 +13,43 @@ export default function Reports({ socket }: { socket: Socket | null }) {
   });
 
   const fetchReports = async () => {
-    const query = new URLSearchParams(filters as any).toString();
-    const res = await fetch(`/api/reports?${query}`);
-    const data = await res.json();
-    setOrders(data);
+    try {
+      let query = supabase
+        .from('orders')
+        .select(`
+          *,
+          table:tables (
+            number
+          )
+        `)
+        .order('createdAt', { ascending: false });
+
+      if (filters.startDate) {
+        query = query.gte('createdAt', `${filters.startDate}T00:00:00`);
+      }
+      if (filters.endDate) {
+        query = query.lte('createdAt', `${filters.endDate}T23:59:59`);
+      }
+      if (filters.status) {
+        query = query.eq('status', filters.status);
+      }
+      if (filters.paymentMethod) {
+        query = query.eq('paymentMethod', filters.paymentMethod);
+      }
+
+      const { data, error } = await query;
+
+      if (error) throw error;
+
+      const formattedOrders = data?.map(order => ({
+        ...order,
+        tableNumber: order.table?.number
+      })) || [];
+
+      setOrders(formattedOrders);
+    } catch (error) {
+      console.error('Error fetching reports:', error);
+    }
   };
 
   useEffect(() => {
@@ -27,7 +60,7 @@ export default function Reports({ socket }: { socket: Socket | null }) {
     setFilters({ ...filters, [e.target.name]: e.target.value });
   };
 
-  const totalRevenue = orders.reduce((sum, order) => sum + order.total, 0);
+  const totalRevenue = orders.reduce((sum, order) => sum + (order.total || 0), 0);
 
   return (
     <div className="space-y-6">

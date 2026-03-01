@@ -1,11 +1,10 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Socket } from 'socket.io-client';
 import { themeConfig } from '../../config/theme';
 import { Trash2, ShoppingBag, ArrowRight } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 
-export default function Cart({ socket }: { socket: Socket | null }) {
+export default function Cart() {
   const navigate = useNavigate();
   const [cart, setCart] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);

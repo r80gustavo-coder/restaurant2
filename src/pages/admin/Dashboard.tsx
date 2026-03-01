@@ -1,11 +1,10 @@
 import { useEffect, useState } from 'react';
-import { Socket } from 'socket.io-client';
 import { themeConfig } from '../../config/theme';
 import { TrendingUp, ShoppingBag, Clock, DollarSign, Users } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { supabase } from '../../lib/supabase';
 
-export default function Dashboard({ socket }: { socket: Socket | null }) {
+export default function Dashboard() {
   const [stats, setStats] = useState({
     totalOrders: 0,
     totalRevenue: 0,

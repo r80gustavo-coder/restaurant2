@@ -1,59 +1,108 @@
 import { useEffect, useState } from 'react';
-import { Socket } from 'socket.io-client';
 import { themeConfig } from '../../config/theme';
 import { DollarSign, Search, CheckCircle2 } from 'lucide-react';
+import { supabase } from '../../lib/supabase';
 
-export default function Checkout({ socket }: { socket: Socket | null }) {
+export default function Checkout() {
   const [tables, setTables] = useState<any[]>([]);
   const [orders, setOrders] = useState<any[]>([]);
   const [selectedTable, setSelectedTable] = useState<any>(null);
   const [paymentMethod, setPaymentMethod] = useState('credit');
 
   const fetchData = async () => {
-    const [tablesRes, ordersRes] = await Promise.all([
-      fetch('/api/tables'),
-      fetch('/api/orders')
-    ]);
-    const tablesData = await tablesRes.json();
-    const ordersData = await ordersRes.json();
-    
-    setTables(tablesData);
-    setOrders(ordersData);
+    try {
+      const [tablesRes, ordersRes] = await Promise.all([
+        supabase.from('tables').select('*').order('number'),
+        supabase.from('orders').select(`
+          *,
+          items:order_items (
+            id,
+            quantity,
+            notes,
+            product:products (
+              name,
+              price
+            )
+          )
+        `).neq('status', 'cancelled') // Fetch active orders
+      ]);
+
+      if (tablesRes.error) throw tablesRes.error;
+      if (ordersRes.error) throw ordersRes.error;
+      
+      // Transform orders to include flattened items
+      const formattedOrders = ordersRes.data?.map(order => ({
+        ...order,
+        items: order.items.map((item: any) => ({
+          ...item,
+          name: item.product?.name,
+          price: item.product?.price
+        }))
+      })) || [];
+
+      setTables(tablesRes.data || []);
+      setOrders(formattedOrders);
+    } catch (error) {
+      console.error('Error fetching checkout data:', error);
+    }
   };
 
   useEffect(() => {
     fetchData();
 
-    if (socket) {
-      socket.on('table_updated', fetchData);
-      socket.on('new_order', fetchData);
-      socket.on('order_status_updated', fetchData);
-      socket.on('orders_paid', fetchData);
-    }
+    const tablesChannel = supabase
+      .channel('checkout-tables')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'tables' }, fetchData)
+      .subscribe();
+
+    const ordersChannel = supabase
+      .channel('checkout-orders')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, fetchData)
+      .subscribe();
 
     return () => {
-      if (socket) {
-        socket.off('table_updated');
-        socket.off('new_order');
-        socket.off('order_status_updated');
-        socket.off('orders_paid');
-      }
+      supabase.removeChannel(tablesChannel);
+      supabase.removeChannel(ordersChannel);
     };
-  }, [socket]);
+  }, []);
 
   const handlePay = async () => {
     if (!selectedTable) return;
     
-    await fetch('/api/orders/pay', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        tableId: selectedTable.id,
-        paymentMethod
-      })
-    });
-    
-    setSelectedTable(null);
+    try {
+      // 1. Get all pending orders for this table
+      const tableOrders = orders.filter(o => o.tableId === selectedTable.id && o.paymentStatus === 'pending' && o.status !== 'cancelled');
+      
+      if (tableOrders.length === 0) return;
+
+      const orderIds = tableOrders.map(o => o.id);
+
+      // 2. Update orders to paid
+      const { error: updateOrdersError } = await supabase
+        .from('orders')
+        .update({ 
+          paymentStatus: 'paid', 
+          paymentMethod: paymentMethod,
+          status: 'delivered' // Assuming payment means the service is complete
+        })
+        .in('id', orderIds);
+
+      if (updateOrdersError) throw updateOrdersError;
+
+      // 3. Set table to free
+      const { error: updateTableError } = await supabase
+        .from('tables')
+        .update({ status: 'livre' })
+        .eq('id', selectedTable.id);
+
+      if (updateTableError) throw updateTableError;
+      
+      setSelectedTable(null);
+      // Realtime will update the UI
+    } catch (error) {
+      console.error('Error processing payment:', error);
+      alert('Erro ao processar pagamento');
+    }
   };
 
   const occupiedTables = tables.filter(t => t.status === 'ocupada');

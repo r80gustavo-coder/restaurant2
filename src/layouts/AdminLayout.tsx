@@ -2,30 +2,32 @@ import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
 import { LayoutDashboard, ShoppingBag, Package, Users, LogOut, Bell, Tag, Box, DollarSign, FileText } from 'lucide-react';
 import { themeConfig } from '../config/theme';
 import { useEffect, useState } from 'react';
-import { Socket } from 'socket.io-client';
 import { motion, AnimatePresence } from 'framer-motion';
+import { supabase } from '../lib/supabase';
 
-export default function AdminLayout({ socket }: { socket: Socket | null }) {
+export default function AdminLayout() {
   const location = useLocation();
   const navigate = useNavigate();
   const [notifications, setNotifications] = useState<any[]>([]);
 
   useEffect(() => {
-    if (!socket) return;
-
-    socket.on('new_order', (order) => {
-      setNotifications(prev => [{
-        id: Date.now(),
-        title: 'Novo Pedido',
-        message: `Mesa ${order.tableNumber} - R$ ${order.total.toFixed(2)}`,
-        time: new Date()
-      }, ...prev]);
-    });
+    const channel = supabase
+      .channel('admin-notifications')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'orders' }, (payload) => {
+        const order = payload.new;
+        setNotifications(prev => [{
+          id: Date.now(),
+          title: 'Novo Pedido',
+          message: `Mesa ${order.tableNumber} - R$ ${order.total.toFixed(2)}`,
+          time: new Date()
+        }, ...prev]);
+      })
+      .subscribe();
 
     return () => {
-      socket.off('new_order');
+      supabase.removeChannel(channel);
     };
-  }, [socket]);
+  }, []);
 
   const navItems = [
     { path: '/admin/dashboard', icon: LayoutDashboard, label: 'Dashboard' },

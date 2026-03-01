@@ -1,10 +1,9 @@
 import { useEffect, useState } from 'react';
-import { Socket } from 'socket.io-client';
 import { themeConfig } from '../../config/theme';
 import { Plus, Trash2, Edit2, Image as ImageIcon, PlusCircle } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 
-export default function Products({ socket }: { socket: Socket | null }) {
+export default function Products() {
   const [products, setProducts] = useState<any[]>([]);
   const [categories, setCategories] = useState<any[]>([]);
   const [inventoryItems, setInventoryItems] = useState<any[]>([]);

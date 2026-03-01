@@ -1,10 +1,9 @@
 import { useEffect, useState } from 'react';
-import { Socket } from 'socket.io-client';
 import { themeConfig } from '../../config/theme';
 import { Plus, Trash2, Edit2, Package, ArrowDownToLine } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 
-export default function Inventory({ socket }: { socket: Socket | null }) {
+export default function Inventory() {
   const [items, setItems] = useState<any[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isAddStockOpen, setIsAddStockOpen] = useState(false);

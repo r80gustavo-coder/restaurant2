@@ -1,12 +1,11 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Socket } from 'socket.io-client';
 import { themeConfig } from '../../config/theme';
 import { Search, Plus, Minus, ShoppingBag, X, Sparkles, UtensilsCrossed } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { supabase } from '../../lib/supabase';
 
-export default function Menu({ socket }: { socket: Socket | null }) {
+export default function Menu() {
   const navigate = useNavigate();
   const [products, setProducts] = useState<any[]>([]);
   const [categories, setCategories] = useState<any[]>([]);

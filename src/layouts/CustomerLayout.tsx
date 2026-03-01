@@ -1,9 +1,8 @@
 import { Outlet, Link, useLocation } from 'react-router-dom';
 import { Home, ShoppingCart, ClipboardList } from 'lucide-react';
 import { themeConfig } from '../config/theme';
-import { Socket } from 'socket.io-client';
 
-export default function CustomerLayout({ socket }: { socket: Socket | null }) {
+export default function CustomerLayout() {
   const location = useLocation();
 
   const navItems = [

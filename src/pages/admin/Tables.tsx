@@ -2,9 +2,8 @@ import { useEffect, useState } from 'react';
 import { themeConfig } from '../../config/theme';
 import { Users, Copy, Check, Plus, Trash2, Edit, Power, PowerOff } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
-import { Socket } from 'socket.io-client';
 
-export default function Tables({ socket }: { socket: Socket | null }) {
+export default function Tables() {
   const [tables, setTables] = useState<any[]>([]);
   const [copiedId, setCopiedId] = useState<number | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);

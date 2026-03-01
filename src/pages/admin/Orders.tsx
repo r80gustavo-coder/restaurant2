@@ -1,10 +1,9 @@
 import { useEffect, useState } from 'react';
-import { Socket } from 'socket.io-client';
 import { themeConfig } from '../../config/theme';
 import { Check, Clock, ChefHat, X, ChevronDown, ChevronUp, ShoppingBag } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 
-export default function Orders({ socket }: { socket: Socket | null }) {
+export default function Orders() {
   const [orders, setOrders] = useState<any[]>([]);
   const [expandedOrderId, setExpandedOrderId] = useState<number | null>(null);
 

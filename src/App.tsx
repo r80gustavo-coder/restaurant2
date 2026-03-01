@@ -1,6 +1,4 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { useState, useEffect } from 'react';
-import { io, Socket } from 'socket.io-client';
 
 // Layouts
 import AdminLayout from './layouts/AdminLayout';
@@ -24,39 +22,29 @@ import OrderStatus from './pages/customer/OrderStatus';
 import TableLogin from './pages/customer/TableLogin';
 
 export default function App() {
-  const [socket, setSocket] = useState<Socket | null>(null);
-
-  useEffect(() => {
-    const newSocket = io();
-    setSocket(newSocket);
-    return () => {
-      newSocket.disconnect();
-    };
-  }, []);
-
   return (
     <BrowserRouter>
       <Routes>
         {/* Admin Routes */}
         <Route path="/admin/login" element={<Login />} />
-        <Route path="/admin" element={<AdminLayout socket={socket} />}>
+        <Route path="/admin" element={<AdminLayout />}>
           <Route index element={<Navigate to="/admin/dashboard" replace />} />
-          <Route path="dashboard" element={<Dashboard socket={socket} />} />
-          <Route path="orders" element={<Orders socket={socket} />} />
-          <Route path="products" element={<Products socket={socket} />} />
-          <Route path="categories" element={<Categories socket={socket} />} />
-          <Route path="inventory" element={<Inventory socket={socket} />} />
-          <Route path="tables" element={<Tables socket={socket} />} />
-          <Route path="checkout" element={<Checkout socket={socket} />} />
-          <Route path="reports" element={<Reports socket={socket} />} />
+          <Route path="dashboard" element={<Dashboard />} />
+          <Route path="orders" element={<Orders />} />
+          <Route path="products" element={<Products />} />
+          <Route path="categories" element={<Categories />} />
+          <Route path="inventory" element={<Inventory />} />
+          <Route path="tables" element={<Tables />} />
+          <Route path="checkout" element={<Checkout />} />
+          <Route path="reports" element={<Reports />} />
         </Route>
 
         {/* Customer Routes */}
         <Route path="/login" element={<TableLogin />} />
-        <Route path="/" element={<CustomerLayout socket={socket} />}>
-          <Route index element={<Menu socket={socket} />} />
-          <Route path="cart" element={<Cart socket={socket} />} />
-          <Route path="status" element={<OrderStatus socket={socket} />} />
+        <Route path="/" element={<CustomerLayout />}>
+          <Route index element={<Menu />} />
+          <Route path="cart" element={<Cart />} />
+          <Route path="status" element={<OrderStatus />} />
         </Route>
       </Routes>
     </BrowserRouter>
