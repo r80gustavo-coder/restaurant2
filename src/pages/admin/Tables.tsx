@@ -126,6 +126,10 @@ export default function Tables() {
 
   const toggleStatus = async (id: number, currentStatus: string) => {
     const newStatus = currentStatus === 'livre' ? 'ocupada' : 'livre';
+    
+    // Optimistic update
+    setTables(prev => prev.map(t => t.id === id ? { ...t, status: newStatus } : t));
+
     try {
       const { error } = await supabase
         .from('tables')
@@ -136,19 +140,28 @@ export default function Tables() {
       // O realtime irá atualizar a lista
     } catch (error) {
       console.error('Error updating status:', error);
+      // Revert on error
+      fetchTables();
     }
   };
 
   const toggleActive = async (table: any) => {
+    const newActive = !table.active;
+    
+    // Optimistic update
+    setTables(prev => prev.map(t => t.id === table.id ? { ...t, active: newActive } : t));
+
     try {
       const { error } = await supabase
         .from('tables')
-        .update({ active: !table.active })
+        .update({ active: newActive })
         .eq('id', table.id);
 
       if (error) throw error;
     } catch (error) {
       console.error('Error updating active status:', error);
+      // Revert on error
+      fetchTables();
     }
   };
 

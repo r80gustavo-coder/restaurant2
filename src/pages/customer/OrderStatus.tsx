@@ -31,6 +31,7 @@ export default function OrderStatus() {
           )
         `)
         .eq('tableId', parseInt(tableId))
+        .neq('paymentStatus', 'paid') // Filter out paid orders (previous sessions)
         .order('createdAt', { ascending: false });
 
       if (error) throw error;
