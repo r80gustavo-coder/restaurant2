@@ -139,6 +139,13 @@ export default function TableLogin() {
       <p className={`mt-8 text-sm font-medium text-${themeConfig.colors.textMuted} relative z-10`}>
         Dúvidas? Chame um garçom.
       </p>
+
+      <button 
+        onClick={() => navigate('/admin/login')}
+        className="absolute bottom-4 right-4 text-xs text-slate-300 hover:text-slate-500 transition-colors z-20"
+      >
+        Acesso Admin
+      </button>
     </div>
   );
 }
