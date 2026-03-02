@@ -244,7 +244,14 @@ export default function Products() {
         .delete()
         .eq('id', id);
 
-      if (error) throw error;
+      if (error) {
+        // Check for foreign key constraint error (e.g., linked to orders)
+        if (error.code === '23503') {
+          alert('Não é possível excluir este produto pois ele já faz parte de pedidos realizados. Sugerimos ocultá-lo (torná-lo invisível) em vez de excluir.');
+          return;
+        }
+        throw error;
+      }
       fetchData();
     } catch (error) {
       console.error('Error deleting product:', error);
