@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { themeConfig } from '../../config/theme';
 import { Check, Clock, ChefHat, X, ChevronDown, ChevronUp, ShoppingBag } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
+import { deductInventory } from '../../services/inventoryService';
 
 export default function Orders() {
   const [orders, setOrders] = useState<any[]>([]);
@@ -85,6 +86,12 @@ export default function Orders() {
       if (error) {
         throw error;
       }
+
+      // If status is delivered, deduct inventory
+      if (status === 'delivered') {
+        await deductInventory(id);
+      }
+
     } catch (error) {
       console.error('Error updating status:', error);
       // Revert changes by fetching original data
