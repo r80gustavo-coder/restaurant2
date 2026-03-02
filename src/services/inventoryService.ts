@@ -52,7 +52,7 @@ export const deductInventory = async (orderId: number) => {
       // Get current stock
       const { data: item, error: fetchError } = await supabase
         .from('inventory_items')
-        .select('quantity')
+        .select('currentStock')
         .eq('id', parseInt(inventoryId))
         .single();
 
@@ -61,11 +61,11 @@ export const deductInventory = async (orderId: number) => {
         continue;
       }
 
-      const newQuantity = Math.max(0, item.quantity - amount);
+      const newQuantity = Math.max(0, (item.currentStock || 0) - amount);
 
       const { error: updateError } = await supabase
         .from('inventory_items')
-        .update({ quantity: newQuantity })
+        .update({ currentStock: newQuantity })
         .eq('id', parseInt(inventoryId));
 
       if (updateError) {

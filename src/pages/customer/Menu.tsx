@@ -26,7 +26,18 @@ export default function Menu() {
     const fetchData = async () => {
       try {
         const [prodRes, catRes] = await Promise.all([
-          supabase.from('products').select('*').order('name'),
+          supabase.from('products').select(`
+            *,
+            inventory_item:inventory_items (
+              currentStock
+            ),
+            ingredients:product_ingredients (
+              quantity,
+              inventory_item:inventory_items (
+                currentStock
+              )
+            )
+          `).order('name'),
           supabase.from('categories').select('*').order('name')
         ]);
 
@@ -63,8 +74,24 @@ export default function Menu() {
     };
   }, [navigate]);
 
+  const isProductInStock = (product: any) => {
+    if (product.type === 'fixed') {
+      return (product.inventory_item?.currentStock || 0) >= 1;
+    } else if (product.type === 'composed') {
+      if (!product.ingredients || product.ingredients.length === 0) return false;
+      for (const ingredient of product.ingredients) {
+        if ((ingredient.inventory_item?.currentStock || 0) < ingredient.quantity) {
+          return false;
+        }
+      }
+      return true;
+    }
+    return true;
+  };
+
   const filteredProducts = products.filter(p => {
     if (p.name.startsWith('[Excluído]')) return false;
+    if (!isProductInStock(p)) return false;
     const matchesCategory = activeCategory ? p.categoryId === parseInt(activeCategory) : true;
     const matchesSearch = p.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
                           (p.description && p.description.toLowerCase().includes(searchQuery.toLowerCase()));

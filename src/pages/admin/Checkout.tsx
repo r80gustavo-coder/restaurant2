@@ -31,7 +31,18 @@ export default function Checkout() {
       const [tablesRes, customersRes, productsRes] = await Promise.all([
         supabase.from('tables').select('*').order('number'),
         supabase.from('customers').select('*').order('name'),
-        supabase.from('products').select('*').order('name')
+        supabase.from('products').select(`
+          *,
+          inventory_item:inventory_items (
+            currentStock
+          ),
+          ingredients:product_ingredients (
+            quantity,
+            inventory_item:inventory_items (
+              currentStock
+            )
+          )
+        `).order('name')
       ]);
 
       if (tablesRes.error) throw tablesRes.error;
@@ -269,8 +280,24 @@ export default function Checkout() {
     }
   };
 
+  const isProductInStock = (product: any) => {
+    if (product.type === 'fixed') {
+      return (product.inventory_item?.currentStock || 0) >= 1;
+    } else if (product.type === 'composed') {
+      if (!product.ingredients || product.ingredients.length === 0) return false;
+      for (const ingredient of product.ingredients) {
+        if ((ingredient.inventory_item?.currentStock || 0) < ingredient.quantity) {
+          return false;
+        }
+      }
+      return true;
+    }
+    return true;
+  };
+
   const filteredProducts = products.filter(p => 
     !p.name.startsWith('[Excluído]') &&
+    isProductInStock(p) &&
     p.name.toLowerCase().includes(itemSearch.toLowerCase()) && 
     (p.visible !== false || p.type !== 'composed')
   );
