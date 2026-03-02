@@ -64,6 +64,7 @@ export default function Menu() {
   }, [navigate]);
 
   const filteredProducts = products.filter(p => {
+    if (p.name.startsWith('[Excluído]')) return false;
     const matchesCategory = activeCategory ? p.categoryId === parseInt(activeCategory) : true;
     const matchesSearch = p.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
                           (p.description && p.description.toLowerCase().includes(searchQuery.toLowerCase()));

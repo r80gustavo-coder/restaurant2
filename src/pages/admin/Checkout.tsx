@@ -270,6 +270,7 @@ export default function Checkout() {
   };
 
   const filteredProducts = products.filter(p => 
+    !p.name.startsWith('[Excluído]') &&
     p.name.toLowerCase().includes(itemSearch.toLowerCase()) && 
     (p.visible !== false || p.type !== 'composed')
   );

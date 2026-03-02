@@ -19,7 +19,7 @@ export default function Inventory() {
       
       if (invRes.error) throw invRes.error;
       setItems(invRes.data || []);
-      setLinkedProducts(prodRes.data || []);
+      setLinkedProducts(prodRes.data?.filter(p => !p.name.startsWith('[Excluído]')) || []);
     } catch (error) {
       console.error('Error fetching inventory:', error);
     }

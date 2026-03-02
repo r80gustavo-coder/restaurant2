@@ -37,9 +37,7 @@ export default function Products() {
               unit
             )
           )
-        `)
-        .or('archived.eq.false,archived.is.null')
-        .order('name'),
+        `).order('name'),
         supabase.from('categories').select('*').order('name'),
         supabase.from('inventory_items').select('*').order('name')
       ]);
@@ -49,14 +47,17 @@ export default function Products() {
       if (invRes.error) throw invRes.error;
       
       // Transform products to include flattened ingredients for easier UI handling
-      const formattedProducts = prodRes.data?.map(p => ({
-        ...p,
-        ingredients: p.ingredients?.map((i: any) => ({
-          ...i,
-          name: i.inventory_item?.name,
-          unit: i.inventory_item?.unit
-        }))
-      })) || [];
+      // Filter out archived or soft-deleted products
+      const formattedProducts = prodRes.data
+        ?.filter(p => !p.archived && !p.name.startsWith('[Excluído]'))
+        .map(p => ({
+          ...p,
+          ingredients: p.ingredients?.map((i: any) => ({
+            ...i,
+            name: i.inventory_item?.name,
+            unit: i.inventory_item?.unit
+          }))
+        })) || [];
 
       setProducts(formattedProducts);
       setCategories(catRes.data || []);
@@ -236,37 +237,39 @@ export default function Products() {
   };
 
   const handleDelete = async (id: number) => {
-    const confirmArchive = confirm('Deseja arquivar este produto? Isso manterá o histórico de vendas mas o removerá das listas ativas. (OK para Arquivar, Cancelar para tentar Exclusão Permanente)');
+    if (!confirm('Tem certeza que deseja excluir este produto?')) return;
     
     try {
-      if (confirmArchive) {
-        const { error } = await supabase
-          .from('products')
-          .update({ archived: true, visible: false })
-          .eq('id', id);
-        if (error) throw error;
-        alert('Produto arquivado com sucesso!');
-      } else {
-        if (!confirm('Tem certeza que deseja EXCLUIR PERMANENTEMENTE? Isso pode falhar se houver vendas vinculadas.')) return;
-        
-        await supabase.from('product_ingredients').delete().eq('productId', id);
-        const { error } = await supabase.from('products').delete().eq('id', id);
-        
-        if (error) {
-          if (error.code === '23503') {
-            alert('Não é possível excluir permanentemente pois existem vendas vinculadas. O produto foi apenas ocultado.');
-            await supabase.from('products').update({ visible: false }).eq('id', id);
-          } else {
-            throw error;
+      // First try to delete ingredients
+      await supabase.from('product_ingredients').delete().eq('productId', id);
+      
+      // Then try to delete the product
+      const { error } = await supabase.from('products').delete().eq('id', id);
+      
+      if (error) {
+        // If it fails due to foreign key (sales history), we do a soft delete
+        if (error.code === '23503') {
+          const productToHide = products.find(p => p.id === id);
+          if (productToHide) {
+            await supabase
+              .from('products')
+              .update({ 
+                visible: false, 
+                name: `[Excluído] ${productToHide.name}` 
+              })
+              .eq('id', id);
+            alert('Como este produto já possui histórico de vendas, ele foi ocultado permanentemente para não quebrar os registros antigos.');
           }
         } else {
-          alert('Produto excluído permanentemente.');
+          throw error;
         }
+      } else {
+        alert('Produto excluído com sucesso.');
       }
       fetchData();
     } catch (error) {
       console.error('Error handling product deletion:', error);
-      alert('Erro ao processar solicitação.');
+      alert('Erro ao processar exclusão do produto.');
     }
   };
 
