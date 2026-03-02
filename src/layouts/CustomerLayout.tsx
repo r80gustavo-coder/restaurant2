@@ -1,5 +1,5 @@
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
-import { Home, ShoppingCart, ClipboardList } from 'lucide-react';
+import { Home, ShoppingCart, ClipboardList, LogOut } from 'lucide-react';
 import { themeConfig } from '../config/theme';
 import { useEffect } from 'react';
 import { supabase } from '../lib/supabase';
@@ -9,7 +9,7 @@ export default function CustomerLayout() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    const tableId = localStorage.getItem('tableId');
+    const tableId = sessionStorage.getItem('tableId');
     if (!tableId) {
       navigate('/login');
       return;
@@ -27,9 +27,9 @@ export default function CustomerLayout() {
           if (newTable.status === 'livre') {
             console.log('Table is free, logging out...');
             // Table was freed (checkout completed), log out user
-            localStorage.removeItem('tableId');
-            localStorage.removeItem('tableCode');
-            localStorage.removeItem('cart');
+            sessionStorage.removeItem('tableId');
+            sessionStorage.removeItem('tableNumber');
+            sessionStorage.removeItem('cart');
             navigate('/login');
           }
         }
@@ -52,7 +52,7 @@ export default function CustomerLayout() {
   return (
     <div className={`min-h-screen bg-${themeConfig.colors.background} flex flex-col pb-20`}>
       {/* Header */}
-      <header className={`bg-${themeConfig.colors.surface} shadow-sm px-4 py-4 sticky top-0 z-50`}>
+      <header className={`bg-${themeConfig.colors.surface} shadow-sm px-4 py-4 sticky top-0 z-50 flex justify-between items-center`}>
         <div className="flex items-center gap-3">
           <img src={themeConfig.logo} alt="Logo" className="w-10 h-10 rounded-full object-cover" referrerPolicy="no-referrer" />
           <div>
@@ -60,6 +60,19 @@ export default function CustomerLayout() {
             <p className={`text-xs text-${themeConfig.colors.textMuted}`}>Faça seu pedido</p>
           </div>
         </div>
+        <button
+          onClick={() => {
+            sessionStorage.removeItem('tableId');
+            sessionStorage.removeItem('tableNumber');
+            sessionStorage.removeItem('cart');
+            navigate('/login');
+          }}
+          className="p-2 text-slate-400 hover:text-red-500 transition-colors flex items-center gap-1 text-sm font-medium"
+          title="Sair do sistema"
+        >
+          <LogOut size={18} />
+          <span className="hidden sm:inline">Sair</span>
+        </button>
       </header>
 
       {/* Main Content */}

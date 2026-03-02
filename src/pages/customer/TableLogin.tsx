@@ -65,8 +65,8 @@ export default function TableLogin() {
       }
       
       // Login bem-sucedido
-      localStorage.setItem('tableId', table.id.toString());
-      localStorage.setItem('tableNumber', table.number.toString());
+      sessionStorage.setItem('tableId', table.id.toString());
+      sessionStorage.setItem('tableNumber', table.number.toString());
       navigate('/'); // Redirecionar para a home (rota correta do cliente)
       
     } catch (err: any) {

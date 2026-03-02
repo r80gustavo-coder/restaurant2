@@ -9,7 +9,7 @@ export default function OrderStatus() {
   const [orders, setOrders] = useState<any[]>([]);
 
   const fetchOrders = async () => {
-    const tableId = localStorage.getItem('tableId');
+    const tableId = sessionStorage.getItem('tableId');
     if (!tableId) {
       navigate('/login');
       return;
@@ -55,7 +55,7 @@ export default function OrderStatus() {
   useEffect(() => {
     fetchOrders();
 
-    const tableId = localStorage.getItem('tableId');
+    const tableId = sessionStorage.getItem('tableId');
     if (!tableId) return;
 
     // Realtime subscription for orders

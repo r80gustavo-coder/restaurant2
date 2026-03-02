@@ -26,10 +26,19 @@ export default function Checkout() {
   const [isDirectSale, setIsDirectSale] = useState(false);
   const [directSaleItems, setDirectSaleItems] = useState<any[]>([]);
 
+  const [customerSearch, setCustomerSearch] = useState('');
+  const [isCustomerDropdownOpen, setIsCustomerDropdownOpen] = useState(false);
+
+  const filteredCustomers = customers.filter(c => 
+    c.name.toLowerCase().includes(customerSearch.toLowerCase()) ||
+    (c.phone && c.phone.includes(customerSearch))
+  );
+
   const fetchData = async () => {
     try {
-      const [tablesRes, productsRes] = await Promise.all([
+      const [tablesRes, customersRes, productsRes] = await Promise.all([
         supabase.from('tables').select('*').order('number'),
+        supabase.from('customers').select('*').order('name'),
         supabase.from('products').select(`
           *,
           inventory_item:inventory_items (
@@ -46,6 +55,7 @@ export default function Checkout() {
 
       if (tablesRes.error) throw tablesRes.error;
       setTables(tablesRes.data || []);
+      setCustomers(customersRes.data || []);
       setProducts(productsRes.data || []);
     } catch (error) {
       console.error('Error fetching data:', error);
@@ -200,7 +210,8 @@ export default function Checkout() {
             status: 'delivered', // Direct sale is immediately delivered
             paymentStatus: 'paid',
             paymentMethod: paymentMethod,
-            total: total
+            total: total,
+            customerId: selectedCustomer ? parseInt(selectedCustomer) : null
           }])
           .select()
           .single();
@@ -240,6 +251,7 @@ export default function Checkout() {
             .update({ 
               paymentStatus: 'paid', 
               status: 'delivered', // Mark as delivered when paid
+              customerId: selectedCustomer ? parseInt(selectedCustomer) : null,
               paymentMethod: paymentMethod
             })
             .eq('id', order.id)
@@ -365,21 +377,59 @@ export default function Checkout() {
 
             <div className="flex-1 overflow-y-auto p-6">
               {/* Customer Selection */}
-              <div className="mb-6">
+              <div className="mb-6 relative">
                 <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Cliente</label>
                 <div className="relative">
-                  <select
-                    value={selectedCustomer}
-                    onChange={(e) => setSelectedCustomer(e.target.value)}
-                    className="w-full p-3 pl-10 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500 appearance-none"
-                  >
-                    <option value="">Cliente não identificado</option>
-                    {customers.map(c => (
-                      <option key={c.id} value={c.id}>{c.name}</option>
-                    ))}
-                  </select>
+                  <input
+                    type="text"
+                    placeholder="Digite o nome do cliente..."
+                    value={customerSearch}
+                    onChange={(e) => {
+                      setCustomerSearch(e.target.value);
+                      setIsCustomerDropdownOpen(true);
+                      if (!e.target.value) {
+                        setSelectedCustomer('');
+                      }
+                    }}
+                    onFocus={() => setIsCustomerDropdownOpen(true)}
+                    className="w-full p-3 pl-10 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  />
                   <User size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                  {selectedCustomer && (
+                    <button
+                      onClick={() => {
+                        setSelectedCustomer('');
+                        setCustomerSearch('');
+                      }}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                    >
+                      ×
+                    </button>
+                  )}
                 </div>
+                
+                {isCustomerDropdownOpen && customerSearch && (
+                  <div className="absolute z-10 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-lg max-h-48 overflow-y-auto">
+                    {filteredCustomers.length > 0 ? (
+                      filteredCustomers.map(c => (
+                        <div
+                          key={c.id}
+                          className="p-3 hover:bg-slate-50 cursor-pointer border-b border-slate-100 last:border-0"
+                          onClick={() => {
+                            setSelectedCustomer(c.id.toString());
+                            setCustomerSearch(c.name);
+                            setIsCustomerDropdownOpen(false);
+                          }}
+                        >
+                          <div className="font-medium text-sm text-slate-700">{c.name}</div>
+                          {c.phone && <div className="text-xs text-slate-500">{c.phone}</div>}
+                        </div>
+                      ))
+                    ) : (
+                      <div className="p-3 text-sm text-slate-500 text-center">Nenhum cliente encontrado</div>
+                    )}
+                  </div>
+                )}
               </div>
 
               {/* Order Items */}

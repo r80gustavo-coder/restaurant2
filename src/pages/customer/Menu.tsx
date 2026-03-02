@@ -17,7 +17,7 @@ export default function Menu() {
   const [isGenerating, setIsGenerating] = useState(false);
 
   useEffect(() => {
-    const tableId = localStorage.getItem('tableId');
+    const tableId = sessionStorage.getItem('tableId');
     if (!tableId) {
       navigate('/login');
       return;
@@ -105,14 +105,14 @@ export default function Menu() {
   const addToCart = () => {
     if (!selectedProduct) return;
 
-    const cart = JSON.parse(localStorage.getItem('cart') || '[]');
+    const cart = JSON.parse(sessionStorage.getItem('cart') || '[]');
     cart.push({
       ...selectedProduct,
       cartItemId: Date.now(),
       quantity,
       notes
     });
-    localStorage.setItem('cart', JSON.stringify(cart));
+    sessionStorage.setItem('cart', JSON.stringify(cart));
     
     setSelectedProduct(null);
     setQuantity(1);

@@ -10,19 +10,19 @@ export default function Cart() {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    const tableId = localStorage.getItem('tableId');
+    const tableId = sessionStorage.getItem('tableId');
     if (!tableId) {
       navigate('/login');
       return;
     }
-    const savedCart = JSON.parse(localStorage.getItem('cart') || '[]');
+    const savedCart = JSON.parse(sessionStorage.getItem('cart') || '[]');
     setCart(savedCart);
   }, [navigate]);
 
   const removeFromCart = (cartItemId: number) => {
     const newCart = cart.filter(item => item.cartItemId !== cartItemId);
     setCart(newCart);
-    localStorage.setItem('cart', JSON.stringify(newCart));
+    sessionStorage.setItem('cart', JSON.stringify(newCart));
   };
 
   const total = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
@@ -31,7 +31,7 @@ export default function Cart() {
     if (cart.length === 0) return;
     setLoading(true);
 
-    const tableId = localStorage.getItem('tableId');
+    const tableId = sessionStorage.getItem('tableId');
     
     try {
       // 1. Criar o pedido na tabela 'orders'
@@ -71,7 +71,7 @@ export default function Cart() {
         .eq('id', parseInt(tableId!));
 
       // 4. Limpar carrinho e redirecionar
-      localStorage.removeItem('cart');
+      sessionStorage.removeItem('cart');
       setCart([]);
       navigate('/status');
       
