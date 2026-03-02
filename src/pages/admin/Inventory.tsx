@@ -14,7 +14,7 @@ export default function Inventory() {
     try {
       const [invRes, prodRes] = await Promise.all([
         supabase.from('inventory_items').select('*').order('name'),
-        supabase.from('products').select('id, name, visible, inventoryItemId').not('inventoryItemId', 'is', null)
+        supabase.from('products').select('id, name, visible, type, inventoryItemId').not('inventoryItemId', 'is', null)
       ]);
       
       if (invRes.error) throw invRes.error;
@@ -88,8 +88,31 @@ export default function Inventory() {
   };
 
   const handleDelete = async (id: number) => {
-    if (!confirm('Tem certeza que deseja excluir este item?')) return;
+    const linkedProduct = linkedProducts.find(p => p.inventoryItemId === id);
+    let message = 'Tem certeza que deseja excluir este item?';
+    if (linkedProduct) {
+      message = `Este item está vinculado ao produto "${linkedProduct.name}". Ao excluir o item, o produto também será excluído ou desvinculado. Deseja continuar?`;
+    }
+
+    if (!confirm(message)) return;
     try {
+      // If there's a linked product, we might need to handle it
+      if (linkedProduct) {
+        // Try to delete the product first if it's a 1:1 link
+        const { error: prodError } = await supabase
+          .from('products')
+          .delete()
+          .eq('id', linkedProduct.id);
+        
+        if (prodError) {
+          if (prodError.code === '23503') {
+            alert('Não é possível excluir o produto vinculado pois ele possui vendas. Oculte o item em vez de excluir.');
+            return;
+          }
+          throw prodError;
+        }
+      }
+
       const { error } = await supabase
         .from('inventory_items')
         .delete()
@@ -99,7 +122,35 @@ export default function Inventory() {
       fetchInventory();
     } catch (error: any) {
       console.error('Error deleting item:', error);
-      alert('Erro ao excluir item. Verifique se ele não está sendo usado em algum produto.');
+      alert('Erro ao excluir item. Verifique se ele não está sendo usado como ingrediente em outros produtos.');
+    }
+  };
+
+  const toggleProductType = async (inventoryItemId: number) => {
+    const linkedProduct = linkedProducts.find(p => p.inventoryItemId === inventoryItemId);
+    if (!linkedProduct) return;
+
+    try {
+      const newType = linkedProduct.type === 'fixed' ? 'composed' : 'fixed';
+      
+      // If changing to composed, we keep the inventoryItemId for now but the UI will treat it as composed
+      // Actually, in Products.tsx, composed products have inventoryItemId = null.
+      // But here, if we set it to null, we lose the link in this view.
+      // So let's just update the type.
+      const { error } = await supabase
+        .from('products')
+        .update({ type: newType })
+        .eq('id', linkedProduct.id);
+
+      if (error) throw error;
+      
+      // Update local state
+      setLinkedProducts(prev => prev.map(p => 
+        p.id === linkedProduct.id ? { ...p, type: newType } : p
+      ));
+    } catch (error) {
+      console.error('Error updating type:', error);
+      alert('Erro ao atualizar tipo do produto');
     }
   };
 
@@ -186,20 +237,35 @@ export default function Inventory() {
               )}
 
               {linkedProduct && (
-                <div className="pt-3 border-t border-slate-200/50 flex items-center justify-between">
-                  <span className="text-xs font-medium text-slate-500">Visível no Cardápio?</span>
-                  <button
-                    onClick={() => toggleProductVisibility(item.id)}
-                    className={`flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs font-bold transition-colors ${
-                      linkedProduct.visible 
-                        ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200' 
-                        : 'bg-slate-200 text-slate-500 hover:bg-slate-300'
-                    }`}
-                    title={linkedProduct.visible ? "Produto visível para clientes" : "Produto oculto"}
-                  >
-                    {linkedProduct.visible ? <Eye size={14} /> : <EyeOff size={14} />}
-                    {linkedProduct.visible ? 'Sim' : 'Não'}
-                  </button>
+                <div className="pt-3 border-t border-slate-200/50 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-medium text-slate-500">Visível no Cardápio?</span>
+                    <button
+                      onClick={() => toggleProductVisibility(item.id)}
+                      className={`flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs font-bold transition-colors ${
+                        linkedProduct.visible 
+                          ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200' 
+                          : 'bg-slate-200 text-slate-500 hover:bg-slate-300'
+                      }`}
+                    >
+                      {linkedProduct.visible ? <Eye size={14} /> : <EyeOff size={14} />}
+                      {linkedProduct.visible ? 'Sim' : 'Não'}
+                    </button>
+                  </div>
+                  
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-medium text-slate-500">Produto Composto?</span>
+                    <button
+                      onClick={() => toggleProductType(item.id)}
+                      className={`flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs font-bold transition-colors ${
+                        linkedProduct.type === 'composed'
+                          ? 'bg-amber-100 text-amber-700 hover:bg-amber-200' 
+                          : 'bg-blue-100 text-blue-700 hover:bg-blue-200'
+                      }`}
+                    >
+                      {linkedProduct.type === 'composed' ? 'Sim' : 'Não'}
+                    </button>
+                  </div>
                 </div>
               )}
             </div>
