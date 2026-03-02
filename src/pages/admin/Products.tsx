@@ -47,9 +47,9 @@ export default function Products() {
       if (invRes.error) throw invRes.error;
       
       // Transform products to include flattened ingredients for easier UI handling
-      // Filter out archived or soft-deleted products
+      // Filter out archived, soft-deleted, and non-visible products
       const formattedProducts = prodRes.data
-        ?.filter(p => !p.archived && !p.name.startsWith('[Excluído]'))
+        ?.filter(p => !p.archived && !p.name.startsWith('[Excluído]') && p.visible !== false)
         .map(p => ({
           ...p,
           ingredients: p.ingredients?.map((i: any) => ({

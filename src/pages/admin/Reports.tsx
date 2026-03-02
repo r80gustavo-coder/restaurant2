@@ -1,10 +1,11 @@
-import { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { themeConfig } from '../../config/theme';
-import { FileText, Filter, Download } from 'lucide-react';
+import { FileText, Filter, Download, ChevronDown, ChevronUp } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 
 export default function Reports() {
   const [orders, setOrders] = useState<any[]>([]);
+  const [expandedOrderId, setExpandedOrderId] = useState<number | null>(null);
   const [filters, setFilters] = useState({
     startDate: '',
     endDate: '',
@@ -20,6 +21,15 @@ export default function Reports() {
           *,
           table:tables (
             number
+          ),
+          items:order_items (
+            id,
+            quantity,
+            price,
+            notes,
+            product:products (
+              name
+            )
           )
         `)
         .order('createdAt', { ascending: false });
@@ -58,6 +68,10 @@ export default function Reports() {
 
   const handleFilterChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     setFilters({ ...filters, [e.target.name]: e.target.value });
+  };
+
+  const toggleExpand = (orderId: number) => {
+    setExpandedOrderId(expandedOrderId === orderId ? null : orderId);
   };
 
   const totalRevenue = orders.reduce((sum, order) => sum + (order.total || 0), 0);
@@ -160,22 +174,59 @@ export default function Reports() {
           </thead>
           <tbody>
             {orders.map((order) => (
-              <tr key={order.id} className="border-b border-slate-100 hover:bg-slate-50 transition-colors">
-                <td className="p-4 font-medium text-slate-900">#{order.id}</td>
-                <td className="p-4 text-slate-600">{new Date(order.createdAt).toLocaleString()}</td>
-                <td className="p-4 text-slate-600">Mesa {order.tableNumber}</td>
-                <td className="p-4">
-                  <span className={`px-2 py-1 text-xs font-bold uppercase rounded-md ${
-                    order.status === 'delivered' ? 'bg-slate-100 text-slate-600' :
-                    order.status === 'cancelled' ? 'bg-red-100 text-red-600' :
-                    'bg-emerald-100 text-emerald-600'
-                  }`}>
-                    {order.status}
-                  </span>
-                </td>
-                <td className="p-4 text-slate-600 uppercase text-sm font-semibold">{order.paymentMethod || '-'}</td>
-                <td className="p-4 text-right font-bold text-slate-900">{themeConfig.currency} {order.total.toFixed(2)}</td>
-              </tr>
+              <React.Fragment key={order.id}>
+                <tr 
+                  onClick={() => toggleExpand(order.id)}
+                  className="border-b border-slate-100 hover:bg-slate-50 transition-colors cursor-pointer"
+                >
+                  <td className="p-4 font-medium text-slate-900 flex items-center gap-2">
+                    {expandedOrderId === order.id ? <ChevronUp size={16} className="text-slate-400" /> : <ChevronDown size={16} className="text-slate-400" />}
+                    #{order.id}
+                  </td>
+                  <td className="p-4 text-slate-600">{new Date(order.createdAt).toLocaleString()}</td>
+                  <td className="p-4 text-slate-600">Mesa {order.tableNumber}</td>
+                  <td className="p-4">
+                    <span className={`px-2 py-1 text-xs font-bold uppercase rounded-md ${
+                      order.status === 'delivered' ? 'bg-slate-100 text-slate-600' :
+                      order.status === 'cancelled' ? 'bg-red-100 text-red-600' :
+                      'bg-emerald-100 text-emerald-600'
+                    }`}>
+                      {order.status}
+                    </span>
+                  </td>
+                  <td className="p-4 text-slate-600 uppercase text-sm font-semibold">{order.paymentMethod || '-'}</td>
+                  <td className="p-4 text-right font-bold text-slate-900">{themeConfig.currency} {order.total.toFixed(2)}</td>
+                </tr>
+                {expandedOrderId === order.id && (
+                  <tr className="bg-slate-50 border-b border-slate-100">
+                    <td colSpan={6} className="p-4">
+                      <div className="pl-8">
+                        <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">Itens do Pedido</h4>
+                        <div className="space-y-2">
+                          {order.items?.map((item: any) => (
+                            <div key={item.id} className="flex justify-between items-center bg-white p-3 rounded-xl border border-slate-200 shadow-sm">
+                              <div>
+                                <p className="font-semibold text-slate-800 text-sm">
+                                  {item.quantity}x {item.product?.name || 'Produto Excluído'}
+                                </p>
+                                {item.notes && (
+                                  <p className="text-xs text-slate-500 mt-0.5">Obs: {item.notes}</p>
+                                )}
+                              </div>
+                              <p className="font-bold text-slate-700 text-sm">
+                                {themeConfig.currency} {(item.price * item.quantity).toFixed(2)}
+                              </p>
+                            </div>
+                          ))}
+                          {(!order.items || order.items.length === 0) && (
+                            <p className="text-sm text-slate-500 italic">Nenhum item encontrado.</p>
+                          )}
+                        </div>
+                      </div>
+                    </td>
+                  </tr>
+                )}
+              </React.Fragment>
             ))}
             {orders.length === 0 && (
               <tr>
