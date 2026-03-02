@@ -28,9 +28,8 @@ export default function Checkout() {
 
   const fetchData = async () => {
     try {
-      const [tablesRes, customersRes, productsRes] = await Promise.all([
+      const [tablesRes, productsRes] = await Promise.all([
         supabase.from('tables').select('*').order('number'),
-        supabase.from('customers').select('*').order('name'),
         supabase.from('products').select(`
           *,
           inventory_item:inventory_items (
@@ -47,7 +46,6 @@ export default function Checkout() {
 
       if (tablesRes.error) throw tablesRes.error;
       setTables(tablesRes.data || []);
-      setCustomers(customersRes.data || []);
       setProducts(productsRes.data || []);
     } catch (error) {
       console.error('Error fetching data:', error);
@@ -202,8 +200,7 @@ export default function Checkout() {
             status: 'delivered', // Direct sale is immediately delivered
             paymentStatus: 'paid',
             paymentMethod: paymentMethod,
-            total: total,
-            customerId: selectedCustomer ? parseInt(selectedCustomer) : null
+            total: total
           }])
           .select()
           .single();
@@ -243,13 +240,15 @@ export default function Checkout() {
             .update({ 
               paymentStatus: 'paid', 
               status: 'delivered', // Mark as delivered when paid
-              customerId: selectedCustomer ? parseInt(selectedCustomer) : null,
               paymentMethod: paymentMethod
             })
             .eq('id', order.id)
         );
 
-        await Promise.all(updates);
+        const updateResults = await Promise.all(updates);
+        for (const res of updateResults) {
+          if (res.error) throw res.error;
+        }
 
         // Deduct inventory for all these orders
         for (const order of orders) {

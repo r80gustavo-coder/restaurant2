@@ -25,10 +25,10 @@ export default function Reports() {
           items:order_items (
             id,
             quantity,
-            price,
             notes,
             product:products (
-              name
+              name,
+              price
             )
           )
         `)
@@ -214,7 +214,7 @@ export default function Reports() {
                                 )}
                               </div>
                               <p className="font-bold text-slate-700 text-sm">
-                                {themeConfig.currency} {(item.price * item.quantity).toFixed(2)}
+                                {themeConfig.currency} {((item.product?.price || 0) * item.quantity).toFixed(2)}
                               </p>
                             </div>
                           ))}
