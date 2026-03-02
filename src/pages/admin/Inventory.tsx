@@ -187,23 +187,28 @@ export default function Inventory() {
         return;
       }
 
+      // We don't include 'archived' here in case the user hasn't run the SQL yet
+      // The DB default will handle it if the column exists
       const { error } = await supabase
         .from('products')
         .insert([{
           name: item.name,
+          description: '',
           price: item.cost || 0,
-          categoryId: categoryId,
+          categoryId: parseInt(categoryId.toString()),
           type: 'fixed',
           visible: false,
-          inventoryItemId: item.id,
-          archived: false
+          inventoryItemId: item.id
         }]);
 
-      if (error) throw error;
+      if (error) {
+        console.error('Supabase error:', error);
+        throw error;
+      }
       fetchInventory();
     } catch (error) {
       console.error('Error creating product from item:', error);
-      alert('Erro ao criar produto');
+      alert('Erro ao criar produto. Verifique se a categoria existe.');
     }
   };
 

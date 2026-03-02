@@ -189,47 +189,48 @@ export default function AdminLayout() {
                     initial={{ opacity: 0, y: 10, scale: 0.95 }}
                     animate={{ opacity: 1, y: 0, scale: 1 }}
                     exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                    className="bg-white rounded-2xl shadow-xl border border-slate-100 overflow-hidden"
                   >
-                    <div className="p-4 border-b border-slate-100 flex justify-between items-center">
-                      <h3 className="font-bold text-slate-800">Notificações</h3>
-                      <button 
-                        onClick={() => setNotifications([])}
-                        className="text-xs text-slate-500 hover:text-red-500"
-                      >
-                        Limpar tudo
-                      </button>
-                    </div>
-                    <div className="max-h-96 overflow-y-auto">
-                      {notifications.length === 0 ? (
-                        <div className="p-8 text-center text-slate-400">
-                          <Bell size={32} className="mx-auto mb-2 opacity-50" />
-                          <p className="text-sm">Nenhuma notificação</p>
-                        </div>
-                      ) : (
-                        notifications.map((notif) => (
-                          <div key={notif.id} className={`p-4 border-b border-slate-50 hover:bg-slate-50 transition-colors ${notif.read ? 'opacity-70' : 'bg-blue-50/50'}`}>
-                            <div className="flex gap-3">
-                              <div className={`mt-1 p-1.5 rounded-full ${
-                                notif.type === 'success' ? 'bg-emerald-100 text-emerald-600' : 
-                                notif.type === 'warning' ? 'bg-orange-100 text-orange-600' : 
-                                'bg-blue-100 text-blue-600'
-                              }`}>
-                                {notif.type === 'success' ? <CheckCircle size={14} /> : 
-                                 notif.type === 'warning' ? <AlertCircle size={14} /> : 
-                                 <Clock size={14} />}
-                              </div>
-                              <div>
-                                <h4 className="text-sm font-semibold text-slate-800">{notif.title}</h4>
-                                <p className="text-xs text-slate-500 mt-0.5">{notif.message}</p>
-                                <span className="text-[10px] text-slate-400 mt-2 block">
-                                  {notif.time.toLocaleTimeString()}
-                                </span>
+                    <div className="bg-white rounded-2xl shadow-xl border border-slate-100 overflow-hidden">
+                      <div className="p-4 border-b border-slate-100 flex justify-between items-center">
+                        <h3 className="font-bold text-slate-800">Notificações</h3>
+                        <button 
+                          onClick={() => setNotifications([])}
+                          className="text-xs text-slate-500 hover:text-red-500"
+                        >
+                          Limpar tudo
+                        </button>
+                      </div>
+                      <div className="max-h-96 overflow-y-auto">
+                        {notifications.length === 0 ? (
+                          <div className="p-8 text-center text-slate-400">
+                            <Bell size={32} className="mx-auto mb-2 opacity-50" />
+                            <p className="text-sm">Nenhuma notificação</p>
+                          </div>
+                        ) : (
+                          notifications.map((notif) => (
+                            <div key={notif.id} className={`p-4 border-b border-slate-50 hover:bg-slate-50 transition-colors ${notif.read ? 'opacity-70' : 'bg-blue-50/50'}`}>
+                              <div className="flex gap-3">
+                                <div className={`mt-1 p-1.5 rounded-full ${
+                                  notif.type === 'success' ? 'bg-emerald-100 text-emerald-600' : 
+                                  notif.type === 'warning' ? 'bg-orange-100 text-orange-600' : 
+                                  'bg-blue-100 text-blue-600'
+                                }`}>
+                                  {notif.type === 'success' ? <CheckCircle size={14} /> : 
+                                   notif.type === 'warning' ? <AlertCircle size={14} /> : 
+                                   <Clock size={14} />}
+                                </div>
+                                <div>
+                                  <h4 className="text-sm font-semibold text-slate-800">{notif.title}</h4>
+                                  <p className="text-xs text-slate-500 mt-0.5">{notif.message}</p>
+                                  <span className="text-[10px] text-slate-400 mt-2 block">
+                                    {notif.time.toLocaleTimeString()}
+                                  </span>
+                                </div>
                               </div>
                             </div>
-                          </div>
-                        ))
-                      )}
+                          ))
+                        )}
+                      </div>
                     </div>
                   </motion.div>
                 </div>
