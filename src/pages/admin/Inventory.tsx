@@ -177,6 +177,36 @@ export default function Inventory() {
     }
   };
 
+  const createProductFromItem = async (item: any) => {
+    try {
+      const { data: categories } = await supabase.from('categories').select('id').limit(1);
+      const categoryId = categories?.[0]?.id;
+
+      if (!categoryId) {
+        alert('Crie pelo menos uma categoria antes de tornar um item vendável.');
+        return;
+      }
+
+      const { error } = await supabase
+        .from('products')
+        .insert([{
+          name: item.name,
+          price: item.cost || 0,
+          categoryId: categoryId,
+          type: 'fixed',
+          visible: false,
+          inventoryItemId: item.id,
+          archived: false
+        }]);
+
+      if (error) throw error;
+      fetchInventory();
+    } catch (error) {
+      console.error('Error creating product from item:', error);
+      alert('Erro ao criar produto');
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
@@ -236,7 +266,16 @@ export default function Inventory() {
                 </div>
               )}
 
-              {linkedProduct && (
+              {!linkedProduct ? (
+                <div className="pt-3 border-t border-slate-200/50">
+                  <button 
+                    onClick={() => createProductFromItem(item)}
+                    className="w-full py-2 bg-slate-100 text-slate-600 rounded-lg text-xs font-bold hover:bg-slate-200 transition-colors flex items-center justify-center gap-2"
+                  >
+                    <Plus size={14} /> Tornar Vendável
+                  </button>
+                </div>
+              ) : (
                 <div className="pt-3 border-t border-slate-200/50 space-y-2">
                   <div className="flex items-center justify-between">
                     <span className="text-xs font-medium text-slate-500">Visível no Cardápio?</span>

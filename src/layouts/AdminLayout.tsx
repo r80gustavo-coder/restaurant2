@@ -182,56 +182,57 @@ export default function AdminLayout() {
               )}
             </button>
 
-            {/* Notifications Dropdown */}
             <AnimatePresence>
               {showNotifications && (
-                <motion.div
-                  initial={{ opacity: 0, y: 10, scale: 0.95 }}
-                  animate={{ opacity: 1, y: 0, scale: 1 }}
-                  exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                  className="absolute right-0 top-full mt-2 w-80 bg-white rounded-2xl shadow-xl border border-slate-100 overflow-hidden z-50"
-                >
-                  <div className="p-4 border-b border-slate-100 flex justify-between items-center">
-                    <h3 className="font-bold text-slate-800">Notificações</h3>
-                    <button 
-                      onClick={() => setNotifications([])}
-                      className="text-xs text-slate-500 hover:text-red-500"
-                    >
-                      Limpar tudo
-                    </button>
-                  </div>
-                  <div className="max-h-96 overflow-y-auto">
-                    {notifications.length === 0 ? (
-                      <div className="p-8 text-center text-slate-400">
-                        <Bell size={32} className="mx-auto mb-2 opacity-50" />
-                        <p className="text-sm">Nenhuma notificação</p>
-                      </div>
-                    ) : (
-                      notifications.map((notif) => (
-                        <div key={notif.id} className={`p-4 border-b border-slate-50 hover:bg-slate-50 transition-colors ${notif.read ? 'opacity-70' : 'bg-blue-50/50'}`}>
-                          <div className="flex gap-3">
-                            <div className={`mt-1 p-1.5 rounded-full ${
-                              notif.type === 'success' ? 'bg-emerald-100 text-emerald-600' : 
-                              notif.type === 'warning' ? 'bg-orange-100 text-orange-600' : 
-                              'bg-blue-100 text-blue-600'
-                            }`}>
-                              {notif.type === 'success' ? <CheckCircle size={14} /> : 
-                               notif.type === 'warning' ? <AlertCircle size={14} /> : 
-                               <Clock size={14} />}
-                            </div>
-                            <div>
-                              <h4 className="text-sm font-semibold text-slate-800">{notif.title}</h4>
-                              <p className="text-xs text-slate-500 mt-0.5">{notif.message}</p>
-                              <span className="text-[10px] text-slate-400 mt-2 block">
-                                {notif.time.toLocaleTimeString()}
-                              </span>
+                <div className="absolute right-0 top-full mt-2 w-80 z-50">
+                  <motion.div
+                    initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                    className="bg-white rounded-2xl shadow-xl border border-slate-100 overflow-hidden"
+                  >
+                    <div className="p-4 border-b border-slate-100 flex justify-between items-center">
+                      <h3 className="font-bold text-slate-800">Notificações</h3>
+                      <button 
+                        onClick={() => setNotifications([])}
+                        className="text-xs text-slate-500 hover:text-red-500"
+                      >
+                        Limpar tudo
+                      </button>
+                    </div>
+                    <div className="max-h-96 overflow-y-auto">
+                      {notifications.length === 0 ? (
+                        <div className="p-8 text-center text-slate-400">
+                          <Bell size={32} className="mx-auto mb-2 opacity-50" />
+                          <p className="text-sm">Nenhuma notificação</p>
+                        </div>
+                      ) : (
+                        notifications.map((notif) => (
+                          <div key={notif.id} className={`p-4 border-b border-slate-50 hover:bg-slate-50 transition-colors ${notif.read ? 'opacity-70' : 'bg-blue-50/50'}`}>
+                            <div className="flex gap-3">
+                              <div className={`mt-1 p-1.5 rounded-full ${
+                                notif.type === 'success' ? 'bg-emerald-100 text-emerald-600' : 
+                                notif.type === 'warning' ? 'bg-orange-100 text-orange-600' : 
+                                'bg-blue-100 text-blue-600'
+                              }`}>
+                                {notif.type === 'success' ? <CheckCircle size={14} /> : 
+                                 notif.type === 'warning' ? <AlertCircle size={14} /> : 
+                                 <Clock size={14} />}
+                              </div>
+                              <div>
+                                <h4 className="text-sm font-semibold text-slate-800">{notif.title}</h4>
+                                <p className="text-xs text-slate-500 mt-0.5">{notif.message}</p>
+                                <span className="text-[10px] text-slate-400 mt-2 block">
+                                  {notif.time.toLocaleTimeString()}
+                                </span>
+                              </div>
                             </div>
                           </div>
-                        </div>
-                      ))
-                    )}
-                  </div>
-                </motion.div>
+                        ))
+                      )}
+                    </div>
+                  </motion.div>
+                </div>
               )}
             </AnimatePresence>
           </div>
@@ -241,7 +242,6 @@ export default function AdminLayout() {
         <div className="flex-1 overflow-auto p-8 relative">
           <Outlet />
 
-          {/* Notifications Toast */}
           <div className="fixed bottom-8 right-8 z-50 flex flex-col gap-3 pointer-events-none">
             <AnimatePresence>
               {notifications.filter(n => !n.read).slice(0, 3).map((notif) => (
@@ -250,31 +250,32 @@ export default function AdminLayout() {
                   initial={{ opacity: 0, x: 50 }}
                   animate={{ opacity: 1, x: 0 }}
                   exit={{ opacity: 0, x: 50 }}
-                  className={`pointer-events-auto bg-white p-4 rounded-xl shadow-lg border-l-4 w-80 flex items-start gap-4 ${
+                >
+                  <div className={`pointer-events-auto bg-white p-4 rounded-xl shadow-lg border-l-4 w-80 flex items-start gap-4 ${
                     notif.type === 'success' ? 'border-emerald-500' : 
                     notif.type === 'warning' ? 'border-orange-500' : 
                     'border-blue-500'
-                  }`}
-                >
-                  <div className={`p-2 rounded-full ${
-                    notif.type === 'success' ? 'bg-emerald-100 text-emerald-600' : 
-                    notif.type === 'warning' ? 'bg-orange-100 text-orange-600' : 
-                    'bg-blue-100 text-blue-600'
                   }`}>
-                    {notif.type === 'success' ? <CheckCircle size={18} /> : 
-                     notif.type === 'warning' ? <AlertCircle size={18} /> : 
-                     <Bell size={18} />}
+                    <div className={`p-2 rounded-full ${
+                      notif.type === 'success' ? 'bg-emerald-100 text-emerald-600' : 
+                      notif.type === 'warning' ? 'bg-orange-100 text-orange-600' : 
+                      'bg-blue-100 text-blue-600'
+                    }`}>
+                      {notif.type === 'success' ? <CheckCircle size={18} /> : 
+                       notif.type === 'warning' ? <AlertCircle size={18} /> : 
+                       <Bell size={18} />}
+                    </div>
+                    <div className="flex-1">
+                      <h4 className="font-bold text-slate-800 text-sm">{notif.title}</h4>
+                      <p className="text-xs text-slate-500 mt-1">{notif.message}</p>
+                    </div>
+                    <button 
+                      onClick={() => setNotifications(prev => prev.map(n => n.id === notif.id ? { ...n, read: true } : n))}
+                      className="text-slate-400 hover:text-slate-600"
+                    >
+                      &times;
+                    </button>
                   </div>
-                  <div className="flex-1">
-                    <h4 className="font-bold text-slate-800 text-sm">{notif.title}</h4>
-                    <p className="text-xs text-slate-500 mt-1">{notif.message}</p>
-                  </div>
-                  <button 
-                    onClick={() => setNotifications(prev => prev.map(n => n.id === notif.id ? { ...n, read: true } : n))}
-                    className="text-slate-400 hover:text-slate-600"
-                  >
-                    &times;
-                  </button>
                 </motion.div>
               ))}
             </AnimatePresence>

@@ -154,12 +154,12 @@ export default function Menu() {
           <h2 className={`text-xl font-bold text-${themeConfig.colors.text} mb-4`}>Categorias</h2>
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
             {categories.map((cat) => (
-              <motion.div
-                key={cat.id}
-                whileTap={{ scale: 0.95 }}
-                onClick={() => setActiveCategory(cat.id.toString())}
-                className="relative h-32 rounded-2xl overflow-hidden shadow-sm cursor-pointer group"
-              >
+              <div key={cat.id} className="relative h-32 rounded-2xl overflow-hidden shadow-sm cursor-pointer group">
+                <motion.div
+                  whileTap={{ scale: 0.95 }}
+                  onClick={() => setActiveCategory(cat.id.toString())}
+                  className="absolute inset-0 z-10"
+                />
                 {cat.image ? (
                   <img 
                     src={cat.image} 
@@ -175,7 +175,7 @@ export default function Menu() {
                 <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent flex items-end p-4">
                   <h3 className="text-white font-bold text-lg leading-tight">{cat.name}</h3>
                 </div>
-              </motion.div>
+              </div>
             ))}
           </div>
         </div>
@@ -198,30 +198,33 @@ export default function Menu() {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, scale: 0.9 }}
-                key={product.id} 
-                onClick={() => { setSelectedProduct(product); setQuantity(1); setNotes(''); }}
-                className={`bg-white p-4 rounded-[2rem] shadow-sm border border-slate-100 flex gap-4 cursor-pointer hover:shadow-md hover:border-${themeConfig.colors.primary}/20 transition-all active:scale-[0.98] group`}
+                key={product.id}
               >
-                {product.image ? (
-                  <div className="w-24 h-24 rounded-2xl overflow-hidden shadow-sm shrink-0">
-                    <img src={product.image} alt={product.name} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" referrerPolicy="no-referrer" />
-                  </div>
-                ) : (
-                  <div className="w-24 h-24 rounded-2xl bg-slate-100 flex items-center justify-center text-slate-300 shrink-0">
-                    <UtensilsCrossed size={24} />
-                  </div>
-                )}
-                <div className="flex-1 flex flex-col justify-between py-1">
-                  <div>
-                    <h3 className={`font-bold text-lg text-${themeConfig.colors.text} leading-tight mb-1 line-clamp-1`}>{product.name}</h3>
-                    <p className={`text-xs text-${themeConfig.colors.textMuted} line-clamp-2 leading-relaxed`}>{product.description}</p>
-                  </div>
-                  <div className="flex justify-between items-end mt-2">
-                    <p className={`font-black text-lg text-${themeConfig.colors.primary}`}>
-                      {themeConfig.currency} {product.price.toFixed(2)}
-                    </p>
-                    <div className={`w-8 h-8 rounded-full bg-slate-50 flex items-center justify-center text-${themeConfig.colors.primary} group-hover:bg-${themeConfig.colors.primary} group-hover:text-white transition-colors`}>
-                      <Plus size={16} />
+                <div 
+                  onClick={() => { setSelectedProduct(product); setQuantity(1); setNotes(''); }}
+                  className={`bg-white p-4 rounded-[2rem] shadow-sm border border-slate-100 flex gap-4 cursor-pointer hover:shadow-md hover:border-${themeConfig.colors.primary}/20 transition-all active:scale-[0.98] group`}
+                >
+                  {product.image ? (
+                    <div className="w-24 h-24 rounded-2xl overflow-hidden shadow-sm shrink-0">
+                      <img src={product.image} alt={product.name} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" referrerPolicy="no-referrer" />
+                    </div>
+                  ) : (
+                    <div className="w-24 h-24 rounded-2xl bg-slate-100 flex items-center justify-center text-slate-300 shrink-0">
+                      <UtensilsCrossed size={24} />
+                    </div>
+                  )}
+                  <div className="flex-1 flex flex-col justify-between py-1">
+                    <div>
+                      <h3 className={`font-bold text-lg text-${themeConfig.colors.text} leading-tight mb-1 line-clamp-1`}>{product.name}</h3>
+                      <p className={`text-xs text-${themeConfig.colors.textMuted} line-clamp-2 leading-relaxed`}>{product.description}</p>
+                    </div>
+                    <div className="flex justify-between items-end mt-2">
+                      <p className={`font-black text-lg text-${themeConfig.colors.primary}`}>
+                        {themeConfig.currency} {product.price.toFixed(2)}
+                      </p>
+                      <div className={`w-8 h-8 rounded-full bg-slate-50 flex items-center justify-center text-${themeConfig.colors.primary} group-hover:bg-${themeConfig.colors.primary} group-hover:text-white transition-colors`}>
+                        <Plus size={16} />
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -240,22 +243,22 @@ export default function Menu() {
         </div>
       )}
 
-      {/* Product Modal */}
       <AnimatePresence>
         {selectedProduct && (
-          <motion.div 
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex flex-col justify-end"
-          >
+          <div className="fixed inset-0 z-50 flex flex-col justify-end">
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+              onClick={() => setSelectedProduct(null)}
+            />
             <motion.div 
               initial={{ y: "100%" }}
               animate={{ y: 0 }}
               exit={{ y: "100%" }}
               transition={{ type: "spring", damping: 25, stiffness: 300 }}
               className="bg-white rounded-t-[2.5rem] p-6 pb-12 max-h-[85vh] overflow-y-auto w-full max-w-md mx-auto relative shadow-2xl flex flex-col"
-              onClick={(e) => e.stopPropagation()}
             >
               <div className="absolute top-4 left-1/2 -translate-x-1/2 w-12 h-1.5 bg-slate-200 rounded-full mb-4" />
               
@@ -325,7 +328,7 @@ export default function Menu() {
                 </button>
               </div>
             </motion.div>
-          </motion.div>
+          </div>
         )}
       </AnimatePresence>
     </div>
