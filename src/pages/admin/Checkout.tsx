@@ -273,11 +273,12 @@ export default function Checkout() {
           .update({ status: 'livre' })
           .eq('id', selectedTable.id);
           
-        // Delete orders history if requested (User asked: "apagar o historico dos pedidos")
-        // We actually just mark them as paid/delivered so they don't show up in active lists.
-        // But if we want to truly "clean" the view, we just refresh.
-        // If the user meant DELETE rows, that's dangerous for records. 
-        // We'll assume "clearing the view" is what they meant, which happens automatically since we filter by !paid.
+        // Delete chat history for this table
+        await supabase
+          .from('orders')
+          .delete()
+          .eq('tableId', selectedTable.id)
+          .in('status', ['chat_unread', 'chat_read']);
 
         alert('Pagamento confirmado e mesa liberada!');
         setSelectedTable(null);
