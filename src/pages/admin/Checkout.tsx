@@ -212,8 +212,7 @@ export default function Checkout() {
             status: 'delivered', // Direct sale is immediately delivered
             paymentStatus: 'paid',
             paymentMethod: paymentMethod,
-            total: total,
-            customerId: selectedCustomer ? parseInt(selectedCustomer) : null
+            total: total
           }])
           .select()
           .single();
@@ -253,7 +252,6 @@ export default function Checkout() {
             .update({ 
               paymentStatus: 'paid', 
               status: 'delivered', // Mark as delivered when paid
-              customerId: selectedCustomer ? parseInt(selectedCustomer) : null,
               paymentMethod: paymentMethod
             })
             .eq('id', order.id)
