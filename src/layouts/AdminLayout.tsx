@@ -52,7 +52,7 @@ export default function AdminLayout() {
               }
             } else if (payload.eventType === 'UPDATE') {
               // Only notify if status changed
-              if (order.status && oldOrder && order.status !== oldOrder.status) {
+              if (order.status && oldOrder && order.status !== oldOrder.status && order.status !== 'chat_read' && order.status !== 'chat_unread') {
                 const tableNum = await fetchTableNumber(order.tableId);
                 title = 'Atualização de Pedido';
                 const statusMap: Record<string, string> = {
