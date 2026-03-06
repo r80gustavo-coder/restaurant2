@@ -27,6 +27,8 @@ export default function Orders() {
             )
           )
         `)
+        .neq('status', 'chat_unread')
+        .neq('status', 'chat_read')
         .order('createdAt', { ascending: false });
 
       if (error) throw error;

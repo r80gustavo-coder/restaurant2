@@ -1,32 +1,34 @@
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
-import { Home, ShoppingCart, ClipboardList, LogOut } from 'lucide-react';
+import { Home, ShoppingCart, ClipboardList, LogOut, Bell } from 'lucide-react';
 import { themeConfig } from '../config/theme';
-import { useEffect } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { supabase } from '../lib/supabase';
+import { motion, AnimatePresence } from 'framer-motion';
+import CustomerChat from '../components/CustomerChat';
 
 export default function CustomerLayout() {
   const location = useLocation();
   const navigate = useNavigate();
+  const [notification, setNotification] = useState<{title: string, message: string} | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
 
   useEffect(() => {
+    audioRef.current = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
     const tableId = sessionStorage.getItem('tableId');
     if (!tableId) {
       navigate('/login');
       return;
     }
 
-    // Monitor table status for auto-logout
+    // Monitor table status for auto-logout and order status changes
     const channel = supabase
-      .channel('customer-layout-table-status')
+      .channel(`customer-layout-${tableId}`)
       .on(
         'postgres_changes', 
         { event: 'UPDATE', schema: 'public', table: 'tables', filter: `id=eq.${tableId}` }, 
         (payload) => {
-          console.log('Table update received:', payload);
           const newTable = payload.new as any;
           if (newTable.status === 'livre') {
-            console.log('Table is free, logging out...');
-            // Table was freed (checkout completed), log out user
             sessionStorage.removeItem('tableId');
             sessionStorage.removeItem('tableNumber');
             sessionStorage.removeItem('cart');
@@ -34,9 +36,36 @@ export default function CustomerLayout() {
           }
         }
       )
-      .subscribe((status) => {
-        console.log('Customer table subscription status:', status);
-      });
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'orders', filter: `tableId=eq.${tableId}` },
+        (payload) => {
+          const newOrder = payload.new as any;
+          const oldOrder = payload.old as any;
+          
+          if (newOrder.status && oldOrder.status && newOrder.status !== oldOrder.status) {
+            if (['preparing', 'ready', 'delivered'].includes(newOrder.status)) {
+              const statusMap: Record<string, string> = {
+                preparing: 'Preparando',
+                ready: 'Pronto',
+                delivered: 'Entregue'
+              };
+              
+              setNotification({
+                title: 'Atualização do Pedido',
+                message: `Seu pedido agora está: ${statusMap[newOrder.status]}`
+              });
+              
+              audioRef.current?.play().catch(e => console.log('Audio blocked', e));
+              
+              setTimeout(() => {
+                setNotification(null);
+              }, 5000);
+            }
+          }
+        }
+      )
+      .subscribe();
 
     return () => {
       supabase.removeChannel(channel);
@@ -79,6 +108,28 @@ export default function CustomerLayout() {
       <main className="flex-1 overflow-auto">
         <Outlet />
       </main>
+
+      <CustomerChat />
+
+      {/* Notification Toast */}
+      <AnimatePresence>
+        {notification && (
+          <motion.div
+            initial={{ opacity: 0, y: -50, x: '-50%' }}
+            animate={{ opacity: 1, y: 0, x: '-50%' }}
+            exit={{ opacity: 0, y: -50, x: '-50%' }}
+            className={`fixed top-20 left-1/2 z-[60] w-[90%] max-w-sm bg-${themeConfig.colors.surface} rounded-2xl shadow-2xl border-l-4 border-${themeConfig.colors.primary} p-4 flex items-start gap-3`}
+          >
+            <div className={`p-2 bg-${themeConfig.colors.primary}/10 rounded-xl text-${themeConfig.colors.primary}`}>
+              <Bell size={20} />
+            </div>
+            <div className="flex-1">
+              <h4 className={`font-bold text-${themeConfig.colors.text} text-sm`}>{notification.title}</h4>
+              <p className={`text-${themeConfig.colors.textMuted} text-xs mt-1`}>{notification.message}</p>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Bottom Navigation */}
       <nav className={`fixed bottom-0 w-full bg-${themeConfig.colors.surface} border-t border-slate-200 flex justify-around py-3 px-6 z-50`}>

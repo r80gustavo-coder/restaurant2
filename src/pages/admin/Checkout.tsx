@@ -91,7 +91,9 @@ export default function Checkout() {
         `)
         .eq('tableId', tableId)
         .neq('paymentStatus', 'paid')
-        .neq('status', 'cancelled');
+        .neq('status', 'cancelled')
+        .neq('status', 'chat_unread')
+        .neq('status', 'chat_read');
 
       if (error) throw error;
       setOrders(data || []);

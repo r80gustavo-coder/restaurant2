@@ -1,5 +1,5 @@
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, ShoppingBag, Package, Users, LogOut, Bell, Tag, Box, DollarSign, FileText, CheckCircle, AlertCircle, Clock } from 'lucide-react';
+import { LayoutDashboard, ShoppingBag, Package, Users, LogOut, Bell, Tag, Box, DollarSign, FileText, CheckCircle, AlertCircle, Clock, MessageSquare } from 'lucide-react';
 import { themeConfig } from '../config/theme';
 import { useEffect, useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -41,9 +41,15 @@ export default function AdminLayout() {
           try {
             if (payload.eventType === 'INSERT') {
               const tableNum = await fetchTableNumber(order.tableId);
-              title = 'Novo Pedido';
-              message = `Mesa ${tableNum} - ${themeConfig.currency} ${order.total?.toFixed(2)}`;
-              type = 'success';
+              if (order.status === 'chat_unread' && order.paymentStatus === 'customer') {
+                title = 'Nova Mensagem';
+                message = `Mesa ${tableNum}: ${order.paymentMethod}`;
+                type = 'info';
+              } else if (order.status !== 'chat_unread' && order.status !== 'chat_read') {
+                title = 'Novo Pedido';
+                message = `Mesa ${tableNum} - ${themeConfig.currency} ${order.total?.toFixed(2)}`;
+                type = 'success';
+              }
             } else if (payload.eventType === 'UPDATE') {
               // Only notify if status changed
               if (order.status && oldOrder && order.status !== oldOrder.status) {
@@ -97,6 +103,7 @@ export default function AdminLayout() {
     { path: '/admin/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
     { path: '/admin/orders', icon: ShoppingBag, label: 'Pedidos' },
     { path: '/admin/checkout', icon: DollarSign, label: 'Caixa' },
+    { path: '/admin/chat', icon: MessageSquare, label: 'Mensagens' },
     { path: '/admin/products', icon: Package, label: 'Produtos' },
     { path: '/admin/categories', icon: Tag, label: 'Categorias' },
     { path: '/admin/customers', icon: Users, label: 'Clientes' },

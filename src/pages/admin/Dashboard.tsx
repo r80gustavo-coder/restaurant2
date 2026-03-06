@@ -19,7 +19,9 @@ export default function Dashboard() {
       // Buscar todos os pedidos
       const { data: orders, error } = await supabase
         .from('orders')
-        .select('*');
+        .select('*')
+        .neq('status', 'chat_unread')
+        .neq('status', 'chat_read');
 
       if (error) throw error;
 
@@ -47,6 +49,8 @@ export default function Dashboard() {
             number
           )
         `)
+        .neq('status', 'chat_unread')
+        .neq('status', 'chat_read')
         .order('createdAt', { ascending: false })
         .limit(5);
 

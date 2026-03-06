@@ -32,6 +32,8 @@ export default function Reports() {
             )
           )
         `)
+        .neq('status', 'chat_unread')
+        .neq('status', 'chat_read')
         .order('createdAt', { ascending: false });
 
       if (filters.startDate) {
