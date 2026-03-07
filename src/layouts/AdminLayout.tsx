@@ -63,6 +63,21 @@ export default function AdminLayout() {
           console.log('🔔 REALTIME EVENT RECEIVED:', payload);
           
           const order = payload.new as any;
+          
+          // DEBUG: Mostrar notificação crua para ver se o evento chega
+          const debugNotification = {
+            id: Date.now() + Math.random(),
+            title: `DEBUG: ${payload.eventType} (Orders)`,
+            message: `ID: ${order?.id} | Status: ${order?.status}`,
+            time: new Date(),
+            type: 'info',
+            read: false
+          };
+          setNotifications(prev => [debugNotification, ...prev]);
+          if (audioRef.current && soundEnabled) {
+            audioRef.current.play().catch(() => {});
+          }
+
           const prevStatus = orderStatusesRef.current[order.id];
           let title = '';
           let message = '';
@@ -129,6 +144,21 @@ export default function AdminLayout() {
         (payload) => {
           console.log('🔔 TABLE EVENT RECEIVED:', payload);
           const newTable = payload.new as any;
+          
+          // DEBUG: Mostrar notificação crua para ver se o evento chega
+          const debugNotification = {
+            id: Date.now() + Math.random(),
+            title: `DEBUG: ${payload.eventType} (Tables)`,
+            message: `Mesa: ${newTable?.number} | Chamando: ${newTable?.needs_waiter}`,
+            time: new Date(),
+            type: 'info',
+            read: false
+          };
+          setNotifications(prev => [debugNotification, ...prev]);
+          if (audioRef.current && soundEnabled) {
+            audioRef.current.play().catch(() => {});
+          }
+
           const prevNeeds = payload.old?.needs_waiter ?? tableNeedsWaiterRef.current[newTable.id];
           
           if (newTable.needs_waiter && !prevNeeds) {
