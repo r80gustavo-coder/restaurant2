@@ -8,6 +8,7 @@ export default function Waiter() {
   const [orders, setOrders] = useState<any[]>([]);
   const [tablesCalling, setTablesCalling] = useState<number[]>([]);
   const [soundEnabled, setSoundEnabled] = useState(false);
+  const soundEnabledRef = useRef(false);
   const navigate = useNavigate();
   const staffName = localStorage.getItem('staffName') || 'Garçom';
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -79,6 +80,10 @@ export default function Waiter() {
   };
 
   useEffect(() => {
+    soundEnabledRef.current = soundEnabled;
+  }, [soundEnabled]);
+
+  useEffect(() => {
     fetchOrders();
     fetchTablesCalling();
 
@@ -92,7 +97,7 @@ export default function Waiter() {
           const oldStatus = payload.old?.status || orderStatusesRef.current[newOrder.id];
           
           if (payload.eventType === 'UPDATE' && newOrder.status === 'ready' && oldStatus !== 'ready') {
-            if (audioRef.current && soundEnabled) {
+            if (audioRef.current && soundEnabledRef.current) {
               audioRef.current.currentTime = 0;
               audioRef.current.play().catch(e => console.log('Audio blocked', e));
             }
@@ -115,7 +120,7 @@ export default function Waiter() {
           const prevNeeds = payload.old?.needs_waiter ?? tableNeedsWaiterRef.current[newTable.id];
           
           if (newTable.needs_waiter && !prevNeeds) {
-            if (audioRef.current && soundEnabled) {
+            if (audioRef.current && soundEnabledRef.current) {
               audioRef.current.currentTime = 0;
               audioRef.current.play().catch(e => console.log('Audio blocked', e));
             }

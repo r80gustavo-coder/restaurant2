@@ -7,6 +7,7 @@ import { useNavigate } from 'react-router-dom';
 export default function Kitchen() {
   const [orders, setOrders] = useState<any[]>([]);
   const [soundEnabled, setSoundEnabled] = useState(false);
+  const soundEnabledRef = useRef(false);
   const navigate = useNavigate();
   const staffName = localStorage.getItem('staffName') || 'Cozinheiro';
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -57,6 +58,10 @@ export default function Kitchen() {
   };
 
   useEffect(() => {
+    soundEnabledRef.current = soundEnabled;
+  }, [soundEnabled]);
+
+  useEffect(() => {
     fetchOrders();
 
     const channel = supabase
@@ -69,7 +74,7 @@ export default function Kitchen() {
           const oldStatus = payload.old?.status || orderStatusesRef.current[newOrder.id];
           
           if (payload.eventType === 'INSERT' || (payload.eventType === 'UPDATE' && newOrder.status === 'pending' && oldStatus !== 'pending')) {
-            if (audioRef.current && soundEnabled) {
+            if (audioRef.current && soundEnabledRef.current) {
               audioRef.current.currentTime = 0;
               audioRef.current.play().catch(e => console.log('Audio blocked', e));
             }

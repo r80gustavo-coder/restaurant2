@@ -11,11 +11,24 @@ export default function AdminLayout() {
   const [notifications, setNotifications] = useState<any[]>([]);
   const [showNotifications, setShowNotifications] = useState(false);
   const [soundEnabled, setSoundEnabled] = useState(false);
+  const soundEnabledRef = useRef(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  useEffect(() => {
+    // Create audio object once
+    if (!audioRef.current) {
+      audioRef.current = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
+      audioRef.current.preload = 'auto';
+    }
+  }, []);
   const orderStatusesRef = useRef<Record<number, string>>({});
   const tableNeedsWaiterRef = useRef<Record<number, boolean>>({});
 
   const [connectionStatus, setConnectionStatus] = useState('connecting');
+
+  useEffect(() => {
+    soundEnabledRef.current = soundEnabled;
+  }, [soundEnabled]);
 
   useEffect(() => {
     // Initialize refs
@@ -111,7 +124,7 @@ export default function AdminLayout() {
               
               setNotifications(prev => [newNotification, ...prev]);
               
-              if (audioRef.current && soundEnabled) {
+              if (audioRef.current && soundEnabledRef.current) {
                 audioRef.current.currentTime = 0;
                 audioRef.current.play().catch(e => console.log('Sound blocked until user interaction'));
               }
@@ -141,7 +154,7 @@ export default function AdminLayout() {
             
             setNotifications(prev => [newNotification, ...prev]);
             
-            if (audioRef.current && soundEnabled) {
+            if (audioRef.current && soundEnabledRef.current) {
               audioRef.current.currentTime = 0;
               audioRef.current.play().catch(e => console.log('Sound blocked until user interaction'));
             }
@@ -188,7 +201,6 @@ export default function AdminLayout() {
 
   return (
     <div className={`min-h-screen bg-${themeConfig.colors.background} flex`}>
-      <audio ref={audioRef} src="https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3" preload="auto" />
       {/* Sidebar */}
       <aside className={`w-64 bg-${themeConfig.colors.surface} border-r border-slate-200 flex flex-col fixed h-full z-20`}>
         <div className="p-6 flex items-center gap-3">
