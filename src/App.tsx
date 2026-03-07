@@ -1,4 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { useEffect } from 'react';
+import { supabase } from './lib/supabase';
 
 // Layouts
 import AdminLayout from './layouts/AdminLayout';
@@ -16,6 +18,9 @@ import Reports from './pages/admin/Reports';
 import Chat from './pages/admin/Chat';
 import Login from './pages/admin/Login';
 import Tables from './pages/admin/Tables';
+import Staff from './pages/admin/Staff';
+import Kitchen from './pages/admin/Kitchen';
+import Waiter from './pages/admin/Waiter';
 
 // Customer Pages
 import Menu from './pages/customer/Menu';
@@ -24,11 +29,37 @@ import OrderStatus from './pages/customer/OrderStatus';
 import TableLogin from './pages/customer/TableLogin';
 
 export default function App() {
+  useEffect(() => {
+    const setupDb = async () => {
+      await supabase.rpc('exec_sql', {
+        query: `
+          CREATE TABLE IF NOT EXISTS staff (
+            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            name TEXT NOT NULL,
+            username TEXT UNIQUE NOT NULL,
+            password TEXT NOT NULL,
+            role TEXT NOT NULL CHECK (role IN ('admin', 'cook', 'waiter')),
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+          );
+          
+          INSERT INTO staff (name, username, password, role)
+          VALUES ('Administrador', 'admin', 'admin', 'admin')
+          ON CONFLICT (username) DO NOTHING;
+
+          ALTER TABLE tables ADD COLUMN IF NOT EXISTS needs_waiter BOOLEAN DEFAULT false;
+        `
+      });
+    };
+    setupDb();
+  }, []);
+
   return (
     <BrowserRouter>
       <Routes>
         {/* Admin Routes */}
         <Route path="/admin/login" element={<Login />} />
+        <Route path="/admin/kitchen" element={<Kitchen />} />
+        <Route path="/admin/waiter" element={<Waiter />} />
         <Route path="/admin" element={<AdminLayout />}>
           <Route index element={<Navigate to="/admin/dashboard" replace />} />
           <Route path="dashboard" element={<Dashboard />} />
@@ -41,6 +72,7 @@ export default function App() {
           <Route path="checkout" element={<Checkout />} />
           <Route path="reports" element={<Reports />} />
           <Route path="chat" element={<Chat />} />
+          <Route path="staff" element={<Staff />} />
         </Route>
 
         {/* Customer Routes */}

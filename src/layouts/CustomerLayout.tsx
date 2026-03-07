@@ -1,5 +1,5 @@
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
-import { Home, ShoppingCart, ClipboardList, LogOut, Bell } from 'lucide-react';
+import { Home, ShoppingCart, ClipboardList, LogOut, Bell, BellRing } from 'lucide-react';
 import { themeConfig } from '../config/theme';
 import { useEffect, useState, useRef } from 'react';
 import { supabase } from '../lib/supabase';
@@ -10,6 +10,7 @@ export default function CustomerLayout() {
   const location = useLocation();
   const navigate = useNavigate();
   const [notification, setNotification] = useState<{title: string, message: string} | null>(null);
+  const [isCallingWaiter, setIsCallingWaiter] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   useEffect(() => {
@@ -78,6 +79,32 @@ export default function CustomerLayout() {
     { path: '/status', icon: ClipboardList, label: 'Pedidos' },
   ];
 
+  const handleCallWaiter = async () => {
+    const tableId = sessionStorage.getItem('tableId');
+    if (!tableId) return;
+
+    setIsCallingWaiter(true);
+    try {
+      const { error } = await supabase
+        .from('tables')
+        .update({ needs_waiter: true })
+        .eq('id', tableId);
+
+      if (error) throw error;
+      
+      setNotification({
+        title: 'Garçom Chamado',
+        message: 'Um garçom está a caminho da sua mesa.'
+      });
+      setTimeout(() => setNotification(null), 5000);
+    } catch (error) {
+      console.error('Error calling waiter:', error);
+      alert('Erro ao chamar o garçom. Tente novamente.');
+    } finally {
+      setTimeout(() => setIsCallingWaiter(false), 5000); // Prevent spam
+    }
+  };
+
   return (
     <div className={`min-h-screen bg-${themeConfig.colors.background} flex flex-col pb-20`}>
       {/* Header */}
@@ -110,6 +137,20 @@ export default function CustomerLayout() {
       </main>
 
       <CustomerChat />
+
+      {/* Call Waiter Floating Button */}
+      <button
+        onClick={handleCallWaiter}
+        disabled={isCallingWaiter}
+        className={`fixed bottom-24 right-4 z-40 p-4 rounded-full shadow-lg flex items-center justify-center transition-all ${
+          isCallingWaiter 
+            ? 'bg-slate-300 text-slate-500 scale-95' 
+            : 'bg-red-500 hover:bg-red-600 text-white hover:scale-105 hover:shadow-xl'
+        }`}
+        title="Chamar Garçom"
+      >
+        <BellRing size={24} className={isCallingWaiter ? '' : 'animate-pulse'} />
+      </button>
 
       {/* Notification Toast */}
       <AnimatePresence>

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { themeConfig } from '../../config/theme';
-import { Users, Copy, Check, Plus, Trash2, Edit, Power, PowerOff } from 'lucide-react';
+import { Users, Copy, Check, Plus, Trash2, Edit, Power, PowerOff, BellRing } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 
 export default function Tables() {
@@ -124,6 +124,20 @@ export default function Tables() {
     }
   };
 
+  const answerCall = async (id: number) => {
+    try {
+      const { error } = await supabase
+        .from('tables')
+        .update({ needs_waiter: false })
+        .eq('id', id);
+
+      if (error) throw error;
+      fetchTables();
+    } catch (error) {
+      console.error('Error answering call:', error);
+    }
+  };
+
   const toggleStatus = async (id: number, currentStatus: string) => {
     const newStatus = currentStatus === 'livre' ? 'ocupada' : 'livre';
     
@@ -200,7 +214,7 @@ export default function Tables() {
               </button>
             </div>
 
-            <div className="absolute top-3 left-3">
+            <div className="absolute top-3 left-3 flex gap-2">
                <button 
                 onClick={() => toggleActive(table)}
                 className={`p-1.5 rounded-lg transition-colors ${table.active ? 'text-emerald-500 hover:bg-emerald-50' : 'text-slate-400 hover:bg-slate-200'}`}
@@ -208,6 +222,16 @@ export default function Tables() {
               >
                 {table.active ? <Power size={18} /> : <PowerOff size={18} />}
               </button>
+              {table.needs_waiter && (
+                <button
+                  onClick={() => answerCall(table.id)}
+                  className="p-1.5 rounded-lg bg-red-100 text-red-600 hover:bg-red-200 transition-colors flex items-center gap-1"
+                  title="Atender Mesa"
+                >
+                  <BellRing size={18} className="animate-pulse" />
+                  <span className="text-xs font-bold">Atender</span>
+                </button>
+              )}
             </div>
 
             <div className={`w-20 h-20 rounded-full ${table.active ? `bg-${themeConfig.colors.primary}/10 text-${themeConfig.colors.primary}` : 'bg-slate-200 text-slate-400'} flex items-center justify-center mb-4 transition-colors`}>

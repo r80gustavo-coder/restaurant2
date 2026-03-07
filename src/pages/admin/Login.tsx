@@ -2,19 +2,56 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { themeConfig } from '../../config/theme';
 import { Lock, User } from 'lucide-react';
+import { supabase } from '../../lib/supabase';
 
 export default function Login() {
   const navigate = useNavigate();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (username === 'admin' && password === 'admin') {
-      navigate('/admin/dashboard');
-    } else {
-      setError('Credenciais inválidas');
+    setLoading(true);
+    setError('');
+
+    try {
+      // Fallback for admin if table doesn't exist yet
+      if (username === 'admin' && password === 'admin') {
+        localStorage.setItem('staffRole', 'admin');
+        localStorage.setItem('staffName', 'Administrador');
+        navigate('/admin/dashboard');
+        return;
+      }
+
+      const { data, error: dbError } = await supabase
+        .from('staff')
+        .select('*')
+        .eq('username', username)
+        .eq('password', password)
+        .single();
+
+      if (dbError || !data) {
+        setError('Credenciais inválidas');
+        return;
+      }
+
+      localStorage.setItem('staffRole', data.role);
+      localStorage.setItem('staffName', data.name);
+
+      if (data.role === 'admin') {
+        navigate('/admin/dashboard');
+      } else if (data.role === 'cook') {
+        navigate('/admin/kitchen');
+      } else if (data.role === 'waiter') {
+        navigate('/admin/waiter');
+      }
+    } catch (err) {
+      console.error('Login error:', err);
+      setError('Erro ao fazer login. Tente novamente.');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -70,9 +107,10 @@ export default function Login() {
 
           <button
             type="submit"
-            className={`w-full py-3.5 px-4 bg-${themeConfig.colors.primary} hover:bg-${themeConfig.colors.primaryHover} text-white font-bold rounded-xl transition-all shadow-md hover:shadow-lg active:scale-[0.98] mt-4`}
+            disabled={loading}
+            className={`w-full py-3.5 px-4 bg-${themeConfig.colors.primary} hover:bg-${themeConfig.colors.primaryHover} text-white font-bold rounded-xl transition-all shadow-md hover:shadow-lg active:scale-[0.98] mt-4 disabled:opacity-70`}
           >
-            Entrar no Painel
+            {loading ? 'Entrando...' : 'Entrar no Painel'}
           </button>
         </form>
       </div>

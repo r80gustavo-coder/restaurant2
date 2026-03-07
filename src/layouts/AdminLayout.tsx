@@ -89,6 +89,31 @@ export default function AdminLayout() {
           }
         }
       )
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'tables' },
+        (payload) => {
+          const newTable = payload.new as any;
+          const oldTable = payload.old as any;
+          
+          if (newTable.needs_waiter && !oldTable.needs_waiter) {
+            const newNotification = {
+              id: Date.now(),
+              title: 'Mesa Chamando',
+              message: `Mesa ${newTable.number} está chamando o garçom!`,
+              time: new Date(),
+              type: 'warning',
+              read: false
+            };
+            
+            setNotifications(prev => [newNotification, ...prev]);
+            
+            if (audioRef.current) {
+              audioRef.current.play().catch(e => console.log('Sound blocked until user interaction'));
+            }
+          }
+        }
+      )
       .subscribe((status) => {
         console.log('🔌 Realtime Status:', status);
         setConnectionStatus(status);
@@ -110,6 +135,7 @@ export default function AdminLayout() {
     { path: '/admin/inventory', icon: Box, label: 'Estoque' },
     { path: '/admin/tables', icon: Users, label: 'Mesas' },
     { path: '/admin/reports', icon: FileText, label: 'Relatórios' },
+    { path: '/admin/staff', icon: Users, label: 'Equipe' },
   ];
 
   const unreadCount = notifications.filter(n => !n.read).length;
