@@ -18,9 +18,6 @@ export default function AdminLayout() {
   const [connectionStatus, setConnectionStatus] = useState('connecting');
 
   useEffect(() => {
-    // Initialize audio
-    audioRef.current = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
-    
     // Initialize refs
     supabase.from('orders').select('id, status').then(({ data }) => {
       if (data) {
@@ -115,6 +112,7 @@ export default function AdminLayout() {
               setNotifications(prev => [newNotification, ...prev]);
               
               if (audioRef.current && soundEnabled) {
+                audioRef.current.currentTime = 0;
                 audioRef.current.play().catch(e => console.log('Sound blocked until user interaction'));
               }
             }
@@ -144,6 +142,7 @@ export default function AdminLayout() {
             setNotifications(prev => [newNotification, ...prev]);
             
             if (audioRef.current && soundEnabled) {
+              audioRef.current.currentTime = 0;
               audioRef.current.play().catch(e => console.log('Sound blocked until user interaction'));
             }
           }
@@ -245,7 +244,14 @@ export default function AdminLayout() {
             )}
             
             <button
-              onClick={() => setSoundEnabled(!soundEnabled)}
+              onClick={() => {
+                const newState = !soundEnabled;
+                setSoundEnabled(newState);
+                if (newState && audioRef.current) {
+                  audioRef.current.currentTime = 0;
+                  audioRef.current.play().catch(e => console.log('Audio blocked', e));
+                }
+              }}
               className={`p-2 rounded-full transition-colors ${soundEnabled ? 'bg-emerald-100 text-emerald-600' : 'bg-slate-100 text-slate-400'}`}
               title={soundEnabled ? "Som ativado" : "Som desativado"}
             >

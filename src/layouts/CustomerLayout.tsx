@@ -15,7 +15,6 @@ export default function CustomerLayout() {
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   useEffect(() => {
-    audioRef.current = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
     const tableId = sessionStorage.getItem('tableId');
     if (!tableId) {
       navigate('/login');
@@ -59,6 +58,7 @@ export default function CustomerLayout() {
               });
               
               if (audioRef.current && soundEnabled) {
+                audioRef.current.currentTime = 0;
                 audioRef.current.play().catch(e => console.log('Audio blocked', e));
               }
               
@@ -100,6 +100,7 @@ export default function CustomerLayout() {
         message: 'Um garçom está a caminho da sua mesa.'
       });
       if (audioRef.current && soundEnabled) {
+        audioRef.current.currentTime = 0;
         audioRef.current.play().catch(e => console.log('Audio blocked', e));
       }
       setTimeout(() => setNotification(null), 5000);
@@ -119,7 +120,15 @@ export default function CustomerLayout() {
   };
 
   return (
-    <div className={`min-h-screen bg-${themeConfig.colors.background} flex flex-col pb-20`} onClick={() => { if (!soundEnabled) setSoundEnabled(true); }}>
+    <div className={`min-h-screen bg-${themeConfig.colors.background} flex flex-col pb-20`} onClick={() => { 
+      if (!soundEnabled) {
+        setSoundEnabled(true);
+        if (audioRef.current) {
+          audioRef.current.currentTime = 0;
+          audioRef.current.play().catch(e => console.log('Audio blocked', e));
+        }
+      }
+    }}>
       <audio ref={audioRef} src="https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3" preload="auto" />
       {/* Header */}
       <header className={`bg-${themeConfig.colors.surface} shadow-sm px-4 py-4 sticky top-0 z-50 flex justify-between items-center`}>
