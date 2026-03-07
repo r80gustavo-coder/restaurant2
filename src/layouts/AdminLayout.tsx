@@ -252,28 +252,6 @@ export default function AdminLayout() {
               {soundEnabled ? <Volume2 size={20} /> : <VolumeX size={20} />}
             </button>
 
-            {/* TEST BUTTON - REMOVE LATER */}
-            <button
-              onClick={() => {
-                const newNotification = {
-                  id: Date.now(),
-                  title: 'Teste de Notificação',
-                  message: 'Se você está vendo isso, a interface está funcionando!',
-                  time: new Date(),
-                  type: 'success',
-                  read: false
-                };
-                setNotifications(prev => [newNotification, ...prev]);
-                if (audioRef.current && soundEnabled) {
-                  audioRef.current.play().catch(e => console.log('Audio blocked', e));
-                }
-              }}
-              className="p-2 rounded-full bg-purple-100 text-purple-600 hover:bg-purple-200 transition-colors text-xs font-bold"
-              title="Testar Notificação"
-            >
-              TESTE
-            </button>
-
             <button 
               onClick={() => {
                 setShowNotifications(!showNotifications);
