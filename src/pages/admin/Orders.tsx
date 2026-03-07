@@ -102,6 +102,40 @@ export default function Orders() {
     }
   };
 
+  const markItemDelivered = async (orderId: number, itemId: number, currentNotes: string | null) => {
+    // Optimistic update
+    setOrders(currentOrders => 
+      currentOrders.map(order => {
+        if (order.id === orderId) {
+          return {
+            ...order,
+            items: order.items.map((item: any) => {
+              if (item.id === itemId) {
+                return { ...item, notes: currentNotes ? `${currentNotes} [ENTREGUE]` : '[ENTREGUE]' };
+              }
+              return item;
+            })
+          };
+        }
+        return order;
+      })
+    );
+
+    try {
+      const newNotes = currentNotes ? `${currentNotes} [ENTREGUE]` : '[ENTREGUE]';
+      const { error } = await supabase
+        .from('order_items')
+        .update({ notes: newNotes })
+        .eq('id', itemId);
+
+      if (error) throw error;
+    } catch (error) {
+      console.error('Error updating item status:', error);
+      fetchOrders();
+      alert('Erro ao marcar item como entregue');
+    }
+  };
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'pending': return 'bg-orange-100 text-orange-700 border-orange-200';
@@ -214,24 +248,50 @@ export default function Orders() {
               <div className="px-6 pb-6 pt-2 border-t border-slate-100 bg-slate-50/50">
                 <h4 className={`font-semibold text-${themeConfig.colors.text} mb-4`}>Itens do Pedido</h4>
                 <div className="space-y-3">
-                  {order.items?.map((item: any) => (
-                    <div key={item.id} className="flex justify-between items-start p-3 bg-white rounded-xl border border-slate-200">
-                      <div>
-                        <p className={`font-medium text-${themeConfig.colors.text}`}>
-                          <span className="font-bold text-slate-400 mr-2">{item.quantity}x</span>
-                          {item.name}
-                        </p>
-                        {item.notes && (
-                          <p className="text-sm text-orange-600 mt-1 bg-orange-50 px-2 py-1 rounded-md inline-block">
-                            Obs: {item.notes}
+                  {order.items?.map((item: any) => {
+                    const isDelivered = item.notes?.includes('[ENTREGUE]');
+                    const displayNotes = item.notes?.replace('[ENTREGUE]', '').trim();
+                    
+                    return (
+                      <div key={item.id} className={`flex justify-between items-center p-3 rounded-xl border ${isDelivered ? 'bg-emerald-50 border-emerald-100' : 'bg-white border-slate-200'}`}>
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2">
+                            <p className={`font-medium ${isDelivered ? 'text-emerald-700 line-through opacity-70' : `text-${themeConfig.colors.text}`}`}>
+                              <span className={`font-bold mr-2 ${isDelivered ? 'text-emerald-600' : 'text-slate-400'}`}>{item.quantity}x</span>
+                              {item.name}
+                            </p>
+                            {isDelivered && (
+                              <span className="px-2 py-0.5 bg-emerald-100 text-emerald-700 text-xs font-bold rounded-md uppercase tracking-wider">
+                                Entregue
+                              </span>
+                            )}
+                          </div>
+                          {displayNotes && (
+                            <p className={`text-sm mt-1 px-2 py-1 rounded-md inline-block ${isDelivered ? 'text-emerald-600 bg-emerald-100/50' : 'text-orange-600 bg-orange-50'}`}>
+                              Obs: {displayNotes}
+                            </p>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-4">
+                          <p className={`font-medium ${isDelivered ? 'text-emerald-700 opacity-70' : `text-${themeConfig.colors.text}`}`}>
+                            {themeConfig.currency} {(item.price * item.quantity).toFixed(2)}
                           </p>
-                        )}
+                          {!isDelivered && order.status !== 'delivered' && order.status !== 'cancelled' && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                markItemDelivered(order.id, item.id, item.notes);
+                              }}
+                              className="p-2 bg-emerald-100 text-emerald-700 hover:bg-emerald-200 rounded-lg transition-colors"
+                              title="Marcar item como entregue"
+                            >
+                              <Check size={16} />
+                            </button>
+                          )}
+                        </div>
                       </div>
-                      <p className={`font-medium text-${themeConfig.colors.text}`}>
-                        {themeConfig.currency} {(item.price * item.quantity).toFixed(2)}
-                      </p>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             )}

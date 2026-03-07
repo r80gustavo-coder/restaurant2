@@ -472,17 +472,25 @@ export default function Checkout() {
                         </span>
                       </div>
                       <div className="space-y-3">
-                        {order.items?.map((item: any) => (
-                          <div key={item.id} className="flex justify-between items-start text-sm">
-                            <div>
-                              <span className="font-bold text-slate-700 mr-2">{item.quantity}x</span>
-                              <span className="text-slate-600">{item.product?.name}</span>
+                        {order.items?.map((item: any) => {
+                          const isDelivered = item.notes?.includes('[ENTREGUE]');
+                          return (
+                            <div key={item.id} className="flex justify-between items-start text-sm">
+                              <div>
+                                <span className={`font-bold mr-2 ${isDelivered ? 'text-emerald-600' : 'text-slate-700'}`}>{item.quantity}x</span>
+                                <span className={`${isDelivered ? 'text-emerald-700 line-through opacity-70' : 'text-slate-600'}`}>{item.product?.name}</span>
+                                {isDelivered && (
+                                  <span className="ml-2 px-1.5 py-0.5 bg-emerald-100 text-emerald-700 text-[10px] font-bold rounded uppercase tracking-wider">
+                                    Entregue
+                                  </span>
+                                )}
+                              </div>
+                              <span className={`font-medium ${isDelivered ? 'text-emerald-700 opacity-70' : 'text-slate-900'}`}>
+                                {themeConfig.currency} {(item.product?.price * item.quantity).toFixed(2)}
+                              </span>
                             </div>
-                            <span className="font-medium text-slate-900">
-                              {themeConfig.currency} {(item.product?.price * item.quantity).toFixed(2)}
-                            </span>
-                          </div>
-                        ))}
+                          );
+                        })}
                       </div>
                     </div>
                   ))
