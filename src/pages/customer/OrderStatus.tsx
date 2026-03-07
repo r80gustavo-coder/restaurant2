@@ -9,14 +9,17 @@ export default function OrderStatus() {
   const [orders, setOrders] = useState<any[]>([]);
 
   const fetchOrders = async () => {
+    const orderType = sessionStorage.getItem('orderType');
     const tableId = sessionStorage.getItem('tableId');
-    if (!tableId) {
+    const customerId = sessionStorage.getItem('customerId');
+
+    if (!orderType && !tableId && !customerId) {
       navigate('/login');
       return;
     }
 
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from('orders')
         .select(`
           *,
@@ -30,11 +33,18 @@ export default function OrderStatus() {
             )
           )
         `)
-        .eq('tableId', parseInt(tableId))
         .neq('paymentStatus', 'paid') // Filter out paid orders (previous sessions)
         .neq('status', 'chat_unread')
         .neq('status', 'chat_read')
         .order('createdAt', { ascending: false });
+
+      if (orderType === 'table' && tableId) {
+        query = query.eq('tableId', parseInt(tableId));
+      } else if (orderType === 'online' && customerId) {
+        query = query.eq('customer_id', customerId);
+      }
+
+      const { data, error } = await query;
 
       if (error) throw error;
 
@@ -57,8 +67,18 @@ export default function OrderStatus() {
   useEffect(() => {
     fetchOrders();
 
+    const orderType = sessionStorage.getItem('orderType');
     const tableId = sessionStorage.getItem('tableId');
-    if (!tableId) return;
+    const customerId = sessionStorage.getItem('customerId');
+
+    let filter = '';
+    if (orderType === 'table' && tableId) {
+      filter = `tableId=eq.${tableId}`;
+    } else if (orderType === 'online' && customerId) {
+      filter = `customer_id=eq.${customerId}`;
+    }
+
+    if (!filter) return;
 
     // Realtime subscription for orders
     const channel = supabase
@@ -69,7 +89,7 @@ export default function OrderStatus() {
           event: '*', 
           schema: 'public', 
           table: 'orders',
-          filter: `tableId=eq.${tableId}`
+          filter: filter
         },
         (payload) => {
           console.log('Order update:', payload);

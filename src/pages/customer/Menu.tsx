@@ -16,8 +16,11 @@ export default function Menu() {
   const [notes, setNotes] = useState('');
 
   useEffect(() => {
+    const orderType = sessionStorage.getItem('orderType');
     const tableId = sessionStorage.getItem('tableId');
-    if (!tableId) {
+    const customerId = sessionStorage.getItem('customerId');
+
+    if (!orderType && !tableId && !customerId) {
       navigate('/login');
       return;
     }

@@ -1,17 +1,21 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { themeConfig } from '../../config/theme';
-import { Trash2, ShoppingBag, ArrowRight } from 'lucide-react';
+import { Trash2, ShoppingBag, ArrowRight, CreditCard, Banknote, Smartphone } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
+import axios from 'axios';
 
 export default function Cart() {
   const navigate = useNavigate();
   const [cart, setCart] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+  const [paymentMethod, setPaymentMethod] = useState('stripe'); // stripe, cash, pix
+  const orderType = sessionStorage.getItem('orderType');
 
   useEffect(() => {
     const tableId = sessionStorage.getItem('tableId');
-    if (!tableId) {
+    const customerId = sessionStorage.getItem('customerId');
+    if (!orderType && !tableId && !customerId) {
       navigate('/login');
       return;
     }
@@ -32,22 +36,33 @@ export default function Cart() {
     setLoading(true);
 
     const tableId = sessionStorage.getItem('tableId');
+    const customerId = sessionStorage.getItem('customerId');
+    const address = sessionStorage.getItem('customerAddress');
     
     try {
+      const orderData: any = {
+        status: 'pending',
+        paymentStatus: 'pending',
+        total: total,
+        type: orderType || 'table'
+      };
+
+      if (orderType === 'table' && tableId) {
+        orderData.tableId = parseInt(tableId);
+      } else if (orderType === 'online' && customerId) {
+        orderData.customer_id = customerId;
+        orderData.delivery_address = { full: address };
+        orderData.payment_method = paymentMethod;
+      }
+
       // 1. Criar o pedido na tabela 'orders'
       const { data: order, error: orderError } = await supabase
         .from('orders')
-        .insert([{
-          tableId: parseInt(tableId!),
-          status: 'pending',
-          paymentStatus: 'pending',
-          total: total
-        }])
+        .insert([orderData])
         .select()
         .single();
 
       if (orderError) throw orderError;
-
       if (!order) throw new Error('Erro ao criar pedido');
 
       // 2. Inserir os itens na tabela 'order_items'
@@ -64,13 +79,31 @@ export default function Cart() {
 
       if (itemsError) throw itemsError;
 
-      // 3. Atualizar status da mesa para ocupada
-      await supabase
-        .from('tables')
-        .update({ status: 'ocupada' })
-        .eq('id', parseInt(tableId!));
+      // 3. Atualizar status da mesa para ocupada (se for mesa)
+      if (orderType === 'table' && tableId) {
+        await supabase
+          .from('tables')
+          .update({ status: 'ocupada' })
+          .eq('id', parseInt(tableId));
+      }
 
-      // 4. Limpar carrinho e redirecionar
+      // 4. Handle Stripe Payment
+      if (orderType === 'online' && paymentMethod === 'stripe') {
+        const response = await axios.post('/api/stripe/create-checkout-session', {
+          items: cart,
+          orderId: order.id,
+          successUrl: `${window.location.origin}/status`,
+          cancelUrl: `${window.location.origin}/cart`
+        });
+        
+        await supabase.from('orders').update({ stripe_session_id: response.data.id }).eq('id', order.id);
+        
+        sessionStorage.removeItem('cart');
+        window.location.href = response.data.url;
+        return;
+      }
+
+      // 5. Limpar carrinho e redirecionar
       sessionStorage.removeItem('cart');
       setCart([]);
       navigate('/status');
@@ -137,7 +170,48 @@ export default function Cart() {
         ))}
       </div>
 
-      <div className="fixed bottom-[72px] left-0 w-full bg-white border-t border-slate-100 p-4 shadow-[0_-10px_40px_-15px_rgba(0,0,0,0.1)] z-40">
+      <div className="fixed bottom-[72px] left-0 w-full bg-white border-t border-slate-100 p-4 shadow-[0_-10px_40px_-15px_rgba(0,0,0,0.1)] z-40 max-h-[50vh] overflow-y-auto">
+        {orderType === 'online' && (
+          <div className="mb-4">
+            <h4 className={`text-sm font-bold text-${themeConfig.colors.text} mb-2 px-2`}>Forma de Pagamento</h4>
+            <div className="grid grid-cols-3 gap-2">
+              <button
+                onClick={() => setPaymentMethod('stripe')}
+                className={`flex flex-col items-center justify-center p-3 rounded-xl border-2 transition-all ${
+                  paymentMethod === 'stripe' 
+                    ? `border-${themeConfig.colors.primary} bg-${themeConfig.colors.primary}/5 text-${themeConfig.colors.primary}` 
+                    : 'border-slate-100 bg-slate-50 text-slate-500 hover:bg-slate-100'
+                }`}
+              >
+                <CreditCard size={24} className="mb-1" />
+                <span className="text-xs font-bold">Cartão</span>
+              </button>
+              <button
+                onClick={() => setPaymentMethod('pix')}
+                className={`flex flex-col items-center justify-center p-3 rounded-xl border-2 transition-all ${
+                  paymentMethod === 'pix' 
+                    ? `border-${themeConfig.colors.primary} bg-${themeConfig.colors.primary}/5 text-${themeConfig.colors.primary}` 
+                    : 'border-slate-100 bg-slate-50 text-slate-500 hover:bg-slate-100'
+                }`}
+              >
+                <Smartphone size={24} className="mb-1" />
+                <span className="text-xs font-bold">Pix</span>
+              </button>
+              <button
+                onClick={() => setPaymentMethod('cash')}
+                className={`flex flex-col items-center justify-center p-3 rounded-xl border-2 transition-all ${
+                  paymentMethod === 'cash' 
+                    ? `border-${themeConfig.colors.primary} bg-${themeConfig.colors.primary}/5 text-${themeConfig.colors.primary}` 
+                    : 'border-slate-100 bg-slate-50 text-slate-500 hover:bg-slate-100'
+                }`}
+              >
+                <Banknote size={24} className="mb-1" />
+                <span className="text-xs font-bold">Dinheiro</span>
+              </button>
+            </div>
+          </div>
+        )}
+
         <div className="flex justify-between items-center mb-4 px-2">
           <span className={`text-lg font-bold text-${themeConfig.colors.textMuted}`}>Total</span>
           <span className={`text-3xl font-black text-${themeConfig.colors.text}`}>

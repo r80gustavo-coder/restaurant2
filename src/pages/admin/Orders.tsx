@@ -17,6 +17,11 @@ export default function Orders() {
           table:tables (
             number
           ),
+          customer:customers (
+            name,
+            phone,
+            address
+          ),
           items:order_items (
             id,
             quantity,
@@ -37,6 +42,9 @@ export default function Orders() {
       const formattedOrders = data?.map(order => ({
         ...order,
         tableNumber: order.table?.number,
+        customerName: order.customer?.name,
+        customerPhone: order.customer?.phone,
+        deliveryAddress: order.delivery_address?.full || order.customer?.address?.full,
         items: order.items.map((item: any) => ({
           ...item,
           name: item.product?.name,
@@ -176,10 +184,17 @@ export default function Orders() {
               onClick={() => setExpandedOrderId(expandedOrderId === order.id ? null : order.id)}
             >
               <div className="flex items-center gap-6">
-                <div className={`w-16 h-16 rounded-2xl bg-${themeConfig.colors.primary}/10 flex flex-col items-center justify-center text-${themeConfig.colors.primary}`}>
-                  <span className="text-xs font-semibold uppercase tracking-wider">Mesa</span>
-                  <span className="text-2xl font-bold">{order.tableNumber}</span>
-                </div>
+                {order.type === 'online' ? (
+                  <div className={`w-16 h-16 rounded-2xl bg-purple-100 flex flex-col items-center justify-center text-purple-600`}>
+                    <ShoppingBag size={24} className="mb-1" />
+                    <span className="text-[10px] font-bold uppercase tracking-wider">Online</span>
+                  </div>
+                ) : (
+                  <div className={`w-16 h-16 rounded-2xl bg-${themeConfig.colors.primary}/10 flex flex-col items-center justify-center text-${themeConfig.colors.primary}`}>
+                    <span className="text-xs font-semibold uppercase tracking-wider">Mesa</span>
+                    <span className="text-2xl font-bold">{order.tableNumber}</span>
+                  </div>
+                )}
                 
                 <div>
                   <div className="flex items-center gap-3 mb-1">
@@ -187,10 +202,18 @@ export default function Orders() {
                     <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider border ${getStatusColor(order.status)}`}>
                       {getStatusLabel(order.status)}
                     </span>
+                    {order.type === 'online' && (
+                      <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider border ${
+                        order.payment_status === 'paid' ? 'bg-emerald-100 text-emerald-700 border-emerald-200' : 'bg-orange-100 text-orange-700 border-orange-200'
+                      }`}>
+                        {order.payment_method?.toUpperCase()} - {order.payment_status === 'paid' ? 'PAGO' : 'PENDENTE'}
+                      </span>
+                    )}
                   </div>
                   <p className={`text-sm text-${themeConfig.colors.textMuted} flex items-center gap-2`}>
                     <Clock size={14} />
                     {new Date(order.createdAt).toLocaleString()}
+                    {order.type === 'online' && ` • ${order.customerName} (${order.customerPhone})`}
                   </p>
                 </div>
               </div>
@@ -246,6 +269,14 @@ export default function Orders() {
 
             {expandedOrderId === order.id && (
               <div className="px-6 pb-6 pt-2 border-t border-slate-100 bg-slate-50/50">
+                {order.type === 'online' && (
+                  <div className="mb-6 p-4 bg-white rounded-xl border border-slate-200">
+                    <h4 className="font-bold text-slate-800 mb-2">Detalhes da Entrega</h4>
+                    <p className="text-sm text-slate-600"><strong>Cliente:</strong> {order.customerName}</p>
+                    <p className="text-sm text-slate-600"><strong>Telefone:</strong> {order.customerPhone}</p>
+                    <p className="text-sm text-slate-600"><strong>Endereço:</strong> {order.deliveryAddress}</p>
+                  </div>
+                )}
                 <h4 className={`font-semibold text-${themeConfig.colors.text} mb-4`}>Itens do Pedido</h4>
                 <div className="space-y-3">
                   {order.items?.map((item: any) => {

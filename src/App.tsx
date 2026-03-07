@@ -27,6 +27,7 @@ import Menu from './pages/customer/Menu';
 import Cart from './pages/customer/Cart';
 import OrderStatus from './pages/customer/OrderStatus';
 import TableLogin from './pages/customer/TableLogin';
+import OnlineLogin from './pages/customer/OnlineLogin';
 
 export default function App() {
   useEffect(() => {
@@ -47,6 +48,36 @@ export default function App() {
           ON CONFLICT (username) DO NOTHING;
 
           ALTER TABLE tables ADD COLUMN IF NOT EXISTS needs_waiter BOOLEAN DEFAULT false;
+
+          CREATE TABLE IF NOT EXISTS drivers (
+              id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+              name TEXT NOT NULL,
+              phone TEXT NOT NULL UNIQUE,
+              password TEXT NOT NULL,
+              vehicle_info TEXT,
+              status TEXT DEFAULT 'pending',
+              is_online BOOLEAN DEFAULT false,
+              current_location JSONB,
+              created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+          );
+
+          CREATE TABLE IF NOT EXISTS customers (
+              id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+              name TEXT NOT NULL,
+              phone TEXT NOT NULL UNIQUE,
+              address JSONB,
+              total_orders INTEGER DEFAULT 0,
+              last_order_date TIMESTAMP WITH TIME ZONE,
+              created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+          );
+
+          ALTER TABLE orders ADD COLUMN IF NOT EXISTS type TEXT DEFAULT 'table';
+          ALTER TABLE orders ADD COLUMN IF NOT EXISTS customer_id UUID REFERENCES customers(id);
+          ALTER TABLE orders ADD COLUMN IF NOT EXISTS delivery_address JSONB;
+          ALTER TABLE orders ADD COLUMN IF NOT EXISTS driver_id UUID REFERENCES drivers(id);
+          ALTER TABLE orders ADD COLUMN IF NOT EXISTS payment_method TEXT;
+          ALTER TABLE orders ADD COLUMN IF NOT EXISTS payment_status TEXT DEFAULT 'pending';
+          ALTER TABLE orders ADD COLUMN IF NOT EXISTS stripe_session_id TEXT;
         `
       });
     };
@@ -77,6 +108,7 @@ export default function App() {
 
         {/* Customer Routes */}
         <Route path="/login" element={<TableLogin />} />
+        <Route path="/online" element={<OnlineLogin />} />
         <Route path="/" element={<CustomerLayout />}>
           <Route index element={<Menu />} />
           <Route path="cart" element={<Cart />} />
