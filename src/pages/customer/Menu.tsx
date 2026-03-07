@@ -14,7 +14,6 @@ export default function Menu() {
   const [selectedProduct, setSelectedProduct] = useState<any | null>(null);
   const [quantity, setQuantity] = useState(1);
   const [notes, setNotes] = useState('');
-  const [isGenerating, setIsGenerating] = useState(false);
 
   useEffect(() => {
     const tableId = sessionStorage.getItem('tableId');
@@ -119,29 +118,15 @@ export default function Menu() {
     setNotes('');
   };
 
-  const generateSuggestion = () => {
-    if (products.length === 0) return;
-    setIsGenerating(true);
-    
-    // Simulate "thinking" time
-    setTimeout(() => {
-      const randomProduct = products[Math.floor(Math.random() * products.length)];
-      setSelectedProduct(randomProduct);
-      setQuantity(1);
-      setNotes('');
-      setIsGenerating(false);
-    }, 800);
-  };
-
   return (
     <div className="pb-24 bg-slate-50 min-h-screen">
-      {/* Search & Generate Header */}
-      <div className={`bg-${themeConfig.colors.surface} px-6 py-4 sticky top-[72px] z-40 shadow-sm border-b border-slate-100`}>
+      {/* Search Header */}
+      <div className={`bg-${themeConfig.colors.surface} px-4 sm:px-6 py-4 sticky top-[72px] z-40 shadow-sm border-b border-slate-100`}>
         <div className="flex gap-3">
           {activeCategory && !searchQuery && (
             <button 
               onClick={() => setActiveCategory(null)}
-              className="p-3.5 rounded-2xl bg-slate-100 text-slate-600 hover:bg-slate-200 transition-colors"
+              className="p-3.5 rounded-2xl bg-slate-100 text-slate-600 hover:bg-slate-200 transition-colors shrink-0"
             >
               <X size={20} />
             </button>
@@ -150,39 +135,22 @@ export default function Menu() {
             <Search className={`absolute left-4 top-1/2 -translate-y-1/2 text-${themeConfig.colors.textMuted}`} size={20} />
             <input
               type="text"
-              placeholder="O que você deseja comer hoje?"
+              placeholder="O que deseja comer?"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className={`w-full pl-12 pr-4 py-3.5 rounded-2xl bg-slate-100 border-2 border-transparent focus:bg-white focus:border-${themeConfig.colors.primary} focus:outline-none focus:ring-0 text-${themeConfig.colors.text} font-medium placeholder:text-slate-400 transition-all shadow-inner`}
+              className={`w-full pl-12 pr-4 py-3.5 rounded-2xl bg-slate-100 border-2 border-transparent focus:bg-white focus:border-${themeConfig.colors.primary} focus:outline-none focus:ring-0 text-${themeConfig.colors.text} font-medium placeholder:text-slate-400 transition-all shadow-inner text-sm sm:text-base`}
             />
           </div>
-          <button
-            onClick={generateSuggestion}
-            disabled={isGenerating}
-            className={`px-4 rounded-2xl bg-gradient-to-br from-${themeConfig.colors.primary} to-emerald-500 text-white shadow-lg shadow-emerald-200 active:scale-95 transition-all flex items-center justify-center min-w-[56px]`}
-            title="Sugestão do Chef"
-          >
-            {isGenerating ? (
-              <motion.div
-                animate={{ rotate: 360 }}
-                transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-              >
-                <Sparkles size={24} />
-              </motion.div>
-            ) : (
-              <Sparkles size={24} />
-            )}
-          </button>
         </div>
       </div>
 
       {!showProducts ? (
         /* Categories Grid */
-        <div className="p-6">
+        <div className="p-4 sm:p-6">
           <h2 className={`text-xl font-bold text-${themeConfig.colors.text} mb-4`}>Categorias</h2>
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 sm:gap-4">
             {categories.map((cat) => (
-              <div key={cat.id} className="relative h-32 rounded-2xl overflow-hidden shadow-sm cursor-pointer group">
+              <div key={cat.id} className="relative h-28 sm:h-32 rounded-2xl overflow-hidden shadow-sm cursor-pointer group">
                 <div 
                   onClick={() => setActiveCategory(cat.id.toString())}
                   className="absolute inset-0 z-20"
@@ -213,7 +181,7 @@ export default function Menu() {
         </div>
       ) : (
         /* Product List */
-        <div className="px-6 py-6 space-y-4">
+        <div className="px-4 sm:px-6 py-4 sm:py-6 space-y-4">
           <div className="flex items-center justify-between mb-2">
             <h2 className={`text-xl font-bold text-${themeConfig.colors.text}`}>
               {searchQuery ? 'Resultados da busca' : categories.find(c => c.id.toString() === activeCategory)?.name || 'Produtos'}
@@ -223,46 +191,48 @@ export default function Menu() {
             </span>
           </div>
 
-          <AnimatePresence mode='popLayout'>
-            {filteredProducts.map(product => (
-              <motion.div 
-                layout
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, scale: 0.9 }}
-                key={product.id}
-              >
-                <div 
-                  onClick={() => { setSelectedProduct(product); setQuantity(1); setNotes(''); }}
-                  className={`bg-white p-4 rounded-[2rem] shadow-sm border border-slate-100 flex gap-4 cursor-pointer hover:shadow-md hover:border-${themeConfig.colors.primary}/20 transition-all active:scale-[0.98] group`}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            <AnimatePresence mode='popLayout'>
+              {filteredProducts.map(product => (
+                <motion.div 
+                  layout
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, scale: 0.9 }}
+                  key={product.id}
                 >
-                  {product.image ? (
-                    <div className="w-24 h-24 rounded-2xl overflow-hidden shadow-sm shrink-0">
-                      <img src={product.image} alt={product.name} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" referrerPolicy="no-referrer" />
-                    </div>
-                  ) : (
-                    <div className="w-24 h-24 rounded-2xl bg-slate-100 flex items-center justify-center text-slate-300 shrink-0">
-                      <UtensilsCrossed size={24} />
-                    </div>
-                  )}
-                  <div className="flex-1 flex flex-col justify-between py-1">
-                    <div>
-                      <h3 className={`font-bold text-lg text-${themeConfig.colors.text} leading-tight mb-1 line-clamp-1`}>{product.name}</h3>
-                      <p className={`text-xs text-${themeConfig.colors.textMuted} line-clamp-2 leading-relaxed`}>{product.description}</p>
-                    </div>
-                    <div className="flex justify-between items-end mt-2">
-                      <p className={`font-black text-lg text-${themeConfig.colors.primary}`}>
-                        {themeConfig.currency} {product.price.toFixed(2)}
-                      </p>
-                      <div className={`w-8 h-8 rounded-full bg-slate-50 flex items-center justify-center text-${themeConfig.colors.primary} group-hover:bg-${themeConfig.colors.primary} group-hover:text-white transition-colors`}>
-                        <Plus size={16} />
+                  <div 
+                    onClick={() => { setSelectedProduct(product); setQuantity(1); setNotes(''); }}
+                    className={`bg-white p-4 rounded-3xl shadow-sm border border-slate-100 flex gap-4 cursor-pointer hover:shadow-md hover:border-${themeConfig.colors.primary}/20 transition-all active:scale-[0.98] group h-full`}
+                  >
+                    {product.image ? (
+                      <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-2xl overflow-hidden shadow-sm shrink-0">
+                        <img src={product.image} alt={product.name} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" referrerPolicy="no-referrer" />
+                      </div>
+                    ) : (
+                      <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-2xl bg-slate-100 flex items-center justify-center text-slate-300 shrink-0">
+                        <UtensilsCrossed size={24} />
+                      </div>
+                    )}
+                    <div className="flex-1 flex flex-col justify-between py-1">
+                      <div>
+                        <h3 className={`font-bold text-lg text-${themeConfig.colors.text} leading-tight mb-1 line-clamp-1`}>{product.name}</h3>
+                        <p className={`text-xs text-${themeConfig.colors.textMuted} line-clamp-2 leading-relaxed`}>{product.description}</p>
+                      </div>
+                      <div className="flex justify-between items-end mt-2">
+                        <p className={`font-black text-lg text-${themeConfig.colors.primary}`}>
+                          {themeConfig.currency} {product.price.toFixed(2)}
+                        </p>
+                        <div className={`w-8 h-8 rounded-full bg-slate-50 flex items-center justify-center text-${themeConfig.colors.primary} group-hover:bg-${themeConfig.colors.primary} group-hover:text-white transition-colors`}>
+                          <Plus size={16} />
+                        </div>
                       </div>
                     </div>
                   </div>
-                </div>
-              </motion.div>
-            ))}
-          </AnimatePresence>
+                </motion.div>
+              ))}
+            </AnimatePresence>
+          </div>
           
           {filteredProducts.length === 0 && (
             <div className="text-center py-12">

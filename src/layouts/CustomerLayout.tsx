@@ -12,7 +12,12 @@ export default function CustomerLayout() {
   const [notification, setNotification] = useState<{title: string, message: string} | null>(null);
   const [isCallingWaiter, setIsCallingWaiter] = useState(false);
   const [soundEnabled, setSoundEnabled] = useState(false);
+  const soundEnabledRef = useRef(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  useEffect(() => {
+    soundEnabledRef.current = soundEnabled;
+  }, [soundEnabled]);
 
   useEffect(() => {
     const tableId = sessionStorage.getItem('tableId');
@@ -57,7 +62,7 @@ export default function CustomerLayout() {
                 message: `Seu pedido agora está: ${statusMap[newOrder.status]}`
               });
               
-              if (audioRef.current && soundEnabled) {
+              if (audioRef.current && soundEnabledRef.current) {
                 audioRef.current.currentTime = 0;
                 audioRef.current.play().catch(e => console.log('Audio blocked', e));
               }
@@ -99,7 +104,7 @@ export default function CustomerLayout() {
         title: 'Garçom Chamado',
         message: 'Um garçom está a caminho da sua mesa.'
       });
-      if (audioRef.current && soundEnabled) {
+      if (audioRef.current && soundEnabledRef.current) {
         audioRef.current.currentTime = 0;
         audioRef.current.play().catch(e => console.log('Audio blocked', e));
       }
