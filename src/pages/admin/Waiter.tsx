@@ -11,6 +11,8 @@ export default function Waiter() {
   const navigate = useNavigate();
   const staffName = localStorage.getItem('staffName') || 'Garçom';
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const orderStatusesRef = useRef<Record<number, string>>({});
+  const tableNeedsWaiterRef = useRef<Record<number, boolean>>({});
 
   const fetchOrders = async () => {
     try {
@@ -45,6 +47,12 @@ export default function Waiter() {
       }));
 
       setOrders(formattedOrders || []);
+      
+      if (data) {
+        const statuses: Record<number, string> = {};
+        data.forEach(o => statuses[o.id] = o.status);
+        orderStatusesRef.current = statuses;
+      }
     } catch (error) {
       console.error('Error fetching orders:', error);
     }
@@ -59,6 +67,12 @@ export default function Waiter() {
 
       if (error) throw error;
       setTablesCalling(data?.map(t => t.number) || []);
+      
+      if (data) {
+        const needs: Record<number, boolean> = {};
+        data.forEach(t => needs[t.id] = true);
+        tableNeedsWaiterRef.current = needs;
+      }
     } catch (error) {
       console.error('Error fetching tables calling:', error);
     }
@@ -75,12 +89,15 @@ export default function Waiter() {
         { event: '*', schema: 'public', table: 'orders' },
         (payload) => {
           const newOrder = payload.new as any;
-          const oldOrder = payload.old as any;
+          const prevStatus = orderStatusesRef.current[newOrder.id];
           
-          if (payload.eventType === 'UPDATE' && newOrder.status === 'ready' && oldOrder.status !== 'ready') {
+          if (payload.eventType === 'UPDATE' && newOrder.status === 'ready' && prevStatus !== 'ready') {
             if (audioRef.current && soundEnabled) {
               audioRef.current.play().catch(e => console.log('Audio blocked', e));
             }
+          }
+          if (newOrder.id) {
+            orderStatusesRef.current[newOrder.id] = newOrder.status;
           }
           fetchOrders();
         }
@@ -94,12 +111,15 @@ export default function Waiter() {
         { event: 'UPDATE', schema: 'public', table: 'tables' },
         (payload) => {
           const newTable = payload.new as any;
-          const oldTable = payload.old as any;
+          const prevNeeds = tableNeedsWaiterRef.current[newTable.id];
           
-          if (newTable.needs_waiter && !oldTable.needs_waiter) {
+          if (newTable.needs_waiter && !prevNeeds) {
             if (audioRef.current && soundEnabled) {
               audioRef.current.play().catch(e => console.log('Audio blocked', e));
             }
+          }
+          if (newTable.id) {
+            tableNeedsWaiterRef.current[newTable.id] = newTable.needs_waiter;
           }
           fetchTablesCalling();
         }
@@ -186,16 +206,6 @@ export default function Waiter() {
           </div>
         </div>
       </header>
-
-      {!soundEnabled && (
-        <div className="bg-blue-50 border-b border-blue-100 p-3 text-center text-blue-800 text-sm font-medium flex items-center justify-center gap-2">
-          <VolumeX size={16} />
-          As notificações sonoras estão desativadas.
-          <button onClick={enableSound} className="underline font-bold hover:text-blue-900">
-            Clique aqui para ativar o som
-          </button>
-        </div>
-      )}
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
         

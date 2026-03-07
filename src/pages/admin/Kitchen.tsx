@@ -10,6 +10,7 @@ export default function Kitchen() {
   const navigate = useNavigate();
   const staffName = localStorage.getItem('staffName') || 'Cozinheiro';
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const orderStatusesRef = useRef<Record<number, string>>({});
 
   const fetchOrders = async () => {
     try {
@@ -44,6 +45,12 @@ export default function Kitchen() {
       }));
 
       setOrders(formattedOrders || []);
+      
+      if (data) {
+        const statuses: Record<number, string> = {};
+        data.forEach(o => statuses[o.id] = o.status);
+        orderStatusesRef.current = statuses;
+      }
     } catch (error) {
       console.error('Error fetching orders:', error);
     }
@@ -59,12 +66,15 @@ export default function Kitchen() {
         { event: '*', schema: 'public', table: 'orders' },
         (payload) => {
           const newOrder = payload.new as any;
-          const oldOrder = payload.old as any;
+          const prevStatus = orderStatusesRef.current[newOrder.id];
           
-          if (payload.eventType === 'INSERT' || (payload.eventType === 'UPDATE' && newOrder.status === 'pending' && oldOrder.status !== 'pending')) {
+          if (payload.eventType === 'INSERT' || (payload.eventType === 'UPDATE' && newOrder.status === 'pending' && prevStatus !== 'pending')) {
             if (audioRef.current && soundEnabled) {
               audioRef.current.play().catch(e => console.log('Audio blocked', e));
             }
+          }
+          if (newOrder.id) {
+            orderStatusesRef.current[newOrder.id] = newOrder.status;
           }
           fetchOrders();
         }
@@ -136,16 +146,6 @@ export default function Kitchen() {
           </div>
         </div>
       </header>
-
-      {!soundEnabled && (
-        <div className="bg-blue-50 border-b border-blue-100 p-3 text-center text-blue-800 text-sm font-medium flex items-center justify-center gap-2">
-          <VolumeX size={16} />
-          As notificações sonoras estão desativadas.
-          <button onClick={enableSound} className="underline font-bold hover:text-blue-900">
-            Clique aqui para ativar o som
-          </button>
-        </div>
-      )}
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">

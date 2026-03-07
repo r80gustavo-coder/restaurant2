@@ -12,6 +12,8 @@ export default function AdminLayout() {
   const [showNotifications, setShowNotifications] = useState(false);
   const [soundEnabled, setSoundEnabled] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const orderStatusesRef = useRef<Record<number, string>>({});
+  const tableNeedsWaiterRef = useRef<Record<number, boolean>>({});
 
   const [connectionStatus, setConnectionStatus] = useState('connecting');
 
@@ -19,6 +21,23 @@ export default function AdminLayout() {
     // Initialize audio
     audioRef.current = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
     
+    // Initialize refs
+    supabase.from('orders').select('id, status').then(({ data }) => {
+      if (data) {
+        const statuses: Record<number, string> = {};
+        data.forEach(o => statuses[o.id] = o.status);
+        orderStatusesRef.current = statuses;
+      }
+    });
+    
+    supabase.from('tables').select('id, needs_waiter').then(({ data }) => {
+      if (data) {
+        const needs: Record<number, boolean> = {};
+        data.forEach(t => needs[t.id] = t.needs_waiter);
+        tableNeedsWaiterRef.current = needs;
+      }
+    });
+
     const fetchTableNumber = async (tableId: number) => {
       const { data } = await supabase.from('tables').select('number').eq('id', tableId).single();
       return data?.number || '?';
@@ -34,13 +53,14 @@ export default function AdminLayout() {
           console.log('🔔 REALTIME EVENT RECEIVED:', payload);
           
           const order = payload.new as any;
-          const oldOrder = payload.old as any;
+          const prevStatus = orderStatusesRef.current[order.id];
           let title = '';
           let message = '';
           let type = 'info';
 
           try {
             if (payload.eventType === 'INSERT') {
+              orderStatusesRef.current[order.id] = order.status;
               const tableNum = await fetchTableNumber(order.tableId);
               if (order.status === 'chat_unread' && order.paymentStatus === 'customer') {
                 title = 'Nova Mensagem';
@@ -53,7 +73,7 @@ export default function AdminLayout() {
               }
             } else if (payload.eventType === 'UPDATE') {
               // Only notify if status changed
-              if (order.status && oldOrder && order.status !== oldOrder.status && order.status !== 'chat_read' && order.status !== 'chat_unread') {
+              if (order.status && prevStatus && order.status !== prevStatus && order.status !== 'chat_read' && order.status !== 'chat_unread') {
                 const tableNum = await fetchTableNumber(order.tableId);
                 title = 'Atualização de Pedido';
                 const statusMap: Record<string, string> = {
@@ -67,6 +87,7 @@ export default function AdminLayout() {
                 message = `Mesa ${tableNum}: Status alterado para ${statusMap[order.status] || order.status}`;
                 type = 'info';
               }
+              orderStatusesRef.current[order.id] = order.status;
             }
 
             if (title) {
@@ -95,9 +116,9 @@ export default function AdminLayout() {
         { event: 'UPDATE', schema: 'public', table: 'tables' },
         (payload) => {
           const newTable = payload.new as any;
-          const oldTable = payload.old as any;
+          const prevNeeds = tableNeedsWaiterRef.current[newTable.id];
           
-          if (newTable.needs_waiter && !oldTable.needs_waiter) {
+          if (newTable.needs_waiter && !prevNeeds) {
             const newNotification = {
               id: Date.now(),
               title: 'Mesa Chamando',
@@ -113,6 +134,7 @@ export default function AdminLayout() {
               audioRef.current.play().catch(e => console.log('Sound blocked until user interaction'));
             }
           }
+          tableNeedsWaiterRef.current[newTable.id] = newTable.needs_waiter;
         }
       )
       .subscribe((status) => {
@@ -290,15 +312,6 @@ export default function AdminLayout() {
         </header>
 
         {/* Page Content */}
-        {!soundEnabled && (
-          <div className="bg-blue-50 border-b border-blue-100 p-3 text-center text-blue-800 text-sm font-medium flex items-center justify-center gap-2">
-            <VolumeX size={16} />
-            As notificações sonoras estão desativadas.
-            <button onClick={enableSound} className="underline font-bold hover:text-blue-900">
-              Clique aqui para ativar o som
-            </button>
-          </div>
-        )}
         <div className="flex-1 overflow-auto p-8 relative">
           <Outlet />
 
