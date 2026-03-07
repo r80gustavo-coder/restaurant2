@@ -7,18 +7,51 @@ import { Phone, User, MapPin } from 'lucide-react';
 
 export default function OnlineLogin() {
   const navigate = useNavigate();
+  const [mode, setMode] = useState<'login' | 'register'>('login');
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [address, setAddress] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!phone) return;
+
+    setLoading(true);
+    try {
+      const { data: customer, error } = await supabase
+        .from('customers')
+        .select('*')
+        .eq('phone', phone)
+        .single();
+
+      if (error || !customer) {
+        alert('Cliente não encontrado. Por favor, faça o cadastro.');
+        setMode('register');
+        return;
+      }
+
+      sessionStorage.setItem('orderType', 'online');
+      sessionStorage.setItem('customerId', customer.id);
+      sessionStorage.setItem('customerName', customer.name);
+      sessionStorage.setItem('customerPhone', customer.phone);
+      sessionStorage.setItem('customerAddress', customer.address?.full || '');
+      
+      navigate('/');
+    } catch (error) {
+      console.error('Login error:', error);
+      alert('Erro ao fazer login. Tente novamente.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name || !phone || !address) return;
 
     setLoading(true);
     try {
-      // Find or create customer
       let { data: customer, error: fetchError } = await supabase
         .from('customers')
         .select('*')
@@ -39,7 +72,6 @@ export default function OnlineLogin() {
         if (insertError) throw insertError;
         customer = newCustomer;
       } else {
-        // Update address if changed
         await supabase
           .from('customers')
           .update({ name, address: { full: address } })
@@ -54,8 +86,8 @@ export default function OnlineLogin() {
       
       navigate('/');
     } catch (error) {
-      console.error('Login error:', error);
-      alert('Erro ao iniciar pedido. Tente novamente.');
+      console.error('Register error:', error);
+      alert('Erro ao realizar cadastro. Tente novamente.');
     } finally {
       setLoading(false);
     }
@@ -74,21 +106,38 @@ export default function OnlineLogin() {
           <p className={`text-${themeConfig.colors.textMuted}`}>Faça seu pedido online</p>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className={`block text-sm font-medium text-${themeConfig.colors.text} mb-1.5`}>Nome Completo</label>
-            <div className="relative">
-              <User className={`absolute left-4 top-1/2 -translate-y-1/2 text-${themeConfig.colors.textMuted}`} size={20} />
-              <input
-                type="text"
-                required
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                className={`w-full pl-12 pr-4 py-3.5 rounded-2xl bg-slate-50 border border-slate-200 focus:bg-white focus:border-${themeConfig.colors.primary} focus:ring-2 focus:ring-${themeConfig.colors.primary}/20 outline-none transition-all`}
-                placeholder="Seu nome"
-              />
+        <div className="flex mb-6 bg-slate-100 p-1 rounded-xl">
+          <button
+            onClick={() => setMode('login')}
+            className={`flex-1 py-2 text-sm font-bold rounded-lg transition-colors ${mode === 'login' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+          >
+            Entrar
+          </button>
+          <button
+            onClick={() => setMode('register')}
+            className={`flex-1 py-2 text-sm font-bold rounded-lg transition-colors ${mode === 'register' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+          >
+            Cadastrar
+          </button>
+        </div>
+
+        <form onSubmit={mode === 'login' ? handleLogin : handleRegister} className="space-y-4">
+          {mode === 'register' && (
+            <div>
+              <label className={`block text-sm font-medium text-${themeConfig.colors.text} mb-1.5`}>Nome Completo</label>
+              <div className="relative">
+                <User className={`absolute left-4 top-1/2 -translate-y-1/2 text-${themeConfig.colors.textMuted}`} size={20} />
+                <input
+                  type="text"
+                  required
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  className={`w-full pl-12 pr-4 py-3.5 rounded-2xl bg-slate-50 border border-slate-200 focus:bg-white focus:border-${themeConfig.colors.primary} focus:ring-2 focus:ring-${themeConfig.colors.primary}/20 outline-none transition-all`}
+                  placeholder="Seu nome"
+                />
+              </div>
             </div>
-          </div>
+          )}
 
           <div>
             <label className={`block text-sm font-medium text-${themeConfig.colors.text} mb-1.5`}>WhatsApp</label>
@@ -105,27 +154,29 @@ export default function OnlineLogin() {
             </div>
           </div>
 
-          <div>
-            <label className={`block text-sm font-medium text-${themeConfig.colors.text} mb-1.5`}>Endereço de Entrega</label>
-            <div className="relative">
-              <MapPin className={`absolute left-4 top-1/2 -translate-y-1/2 text-${themeConfig.colors.textMuted}`} size={20} />
-              <input
-                type="text"
-                required
-                value={address}
-                onChange={(e) => setAddress(e.target.value)}
-                className={`w-full pl-12 pr-4 py-3.5 rounded-2xl bg-slate-50 border border-slate-200 focus:bg-white focus:border-${themeConfig.colors.primary} focus:ring-2 focus:ring-${themeConfig.colors.primary}/20 outline-none transition-all`}
-                placeholder="Rua, Número, Bairro"
-              />
+          {mode === 'register' && (
+            <div>
+              <label className={`block text-sm font-medium text-${themeConfig.colors.text} mb-1.5`}>Endereço de Entrega</label>
+              <div className="relative">
+                <MapPin className={`absolute left-4 top-1/2 -translate-y-1/2 text-${themeConfig.colors.textMuted}`} size={20} />
+                <input
+                  type="text"
+                  required
+                  value={address}
+                  onChange={(e) => setAddress(e.target.value)}
+                  className={`w-full pl-12 pr-4 py-3.5 rounded-2xl bg-slate-50 border border-slate-200 focus:bg-white focus:border-${themeConfig.colors.primary} focus:ring-2 focus:ring-${themeConfig.colors.primary}/20 outline-none transition-all`}
+                  placeholder="Rua, Número, Bairro"
+                />
+              </div>
             </div>
-          </div>
+          )}
 
           <button
             type="submit"
             disabled={loading}
             className={`w-full py-4 rounded-2xl bg-${themeConfig.colors.primary} text-white font-bold text-lg shadow-lg shadow-${themeConfig.colors.primary}/30 active:scale-[0.98] transition-all disabled:opacity-70 mt-4`}
           >
-            {loading ? 'Entrando...' : 'Ver Cardápio'}
+            {loading ? 'Aguarde...' : mode === 'login' ? 'Entrar' : 'Começar Pedido'}
           </button>
         </form>
       </motion.div>

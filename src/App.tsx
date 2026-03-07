@@ -73,7 +73,8 @@ export default function App() {
           ALTER TABLE customers ADD COLUMN IF NOT EXISTS last_order_date TIMESTAMP WITH TIME ZONE;
 
           ALTER TABLE orders ADD COLUMN IF NOT EXISTS type TEXT DEFAULT 'table';
-          ALTER TABLE orders ADD COLUMN IF NOT EXISTS customer_id BIGINT REFERENCES customers(id);
+          ALTER TABLE orders DROP COLUMN IF EXISTS customer_id CASCADE;
+          ALTER TABLE orders ADD COLUMN customer_id BIGINT REFERENCES customers(id);
           ALTER TABLE orders ADD COLUMN IF NOT EXISTS delivery_address JSONB;
           ALTER TABLE orders ADD COLUMN IF NOT EXISTS driver_id UUID REFERENCES drivers(id);
           ALTER TABLE orders ADD COLUMN IF NOT EXISTS payment_method TEXT;
