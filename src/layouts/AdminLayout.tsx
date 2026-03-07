@@ -72,8 +72,9 @@ export default function AdminLayout() {
                 type = 'success';
               }
             } else if (payload.eventType === 'UPDATE') {
+              const oldStatus = payload.old?.status || prevStatus;
               // Only notify if status changed
-              if (order.status && prevStatus && order.status !== prevStatus && order.status !== 'chat_read' && order.status !== 'chat_unread') {
+              if (order.status && order.status !== oldStatus && order.status !== 'chat_read' && order.status !== 'chat_unread') {
                 const tableNum = await fetchTableNumber(order.tableId);
                 title = 'Atualização de Pedido';
                 const statusMap: Record<string, string> = {
@@ -116,7 +117,7 @@ export default function AdminLayout() {
         { event: 'UPDATE', schema: 'public', table: 'tables' },
         (payload) => {
           const newTable = payload.new as any;
-          const prevNeeds = tableNeedsWaiterRef.current[newTable.id];
+          const prevNeeds = payload.old?.needs_waiter ?? tableNeedsWaiterRef.current[newTable.id];
           
           if (newTable.needs_waiter && !prevNeeds) {
             const newNotification = {

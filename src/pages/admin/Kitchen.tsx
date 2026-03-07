@@ -66,9 +66,9 @@ export default function Kitchen() {
         { event: '*', schema: 'public', table: 'orders' },
         (payload) => {
           const newOrder = payload.new as any;
-          const prevStatus = orderStatusesRef.current[newOrder.id];
+          const oldStatus = payload.old?.status || orderStatusesRef.current[newOrder.id];
           
-          if (payload.eventType === 'INSERT' || (payload.eventType === 'UPDATE' && newOrder.status === 'pending' && prevStatus !== 'pending')) {
+          if (payload.eventType === 'INSERT' || (payload.eventType === 'UPDATE' && newOrder.status === 'pending' && oldStatus !== 'pending')) {
             if (audioRef.current && soundEnabled) {
               audioRef.current.play().catch(e => console.log('Audio blocked', e));
             }
