@@ -1,14 +1,16 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { themeConfig } from '../../config/theme';
-import { Check, Clock, User, LogOut, BellRing } from 'lucide-react';
+import { Check, Clock, User, LogOut, BellRing, Volume2, VolumeX } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useNavigate } from 'react-router-dom';
 
 export default function Waiter() {
   const [orders, setOrders] = useState<any[]>([]);
   const [tablesCalling, setTablesCalling] = useState<number[]>([]);
+  const [soundEnabled, setSoundEnabled] = useState(false);
   const navigate = useNavigate();
   const staffName = localStorage.getItem('staffName') || 'Garçom';
+  const audioRef = useRef<HTMLAudioElement | null>(null);
 
   const fetchOrders = async () => {
     try {
@@ -71,7 +73,15 @@ export default function Waiter() {
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'orders' },
-        () => {
+        (payload) => {
+          const newOrder = payload.new as any;
+          const oldOrder = payload.old as any;
+          
+          if (payload.eventType === 'UPDATE' && newOrder.status === 'ready' && oldOrder.status !== 'ready') {
+            if (audioRef.current && soundEnabled) {
+              audioRef.current.play().catch(e => console.log('Audio blocked', e));
+            }
+          }
           fetchOrders();
         }
       )
@@ -81,8 +91,16 @@ export default function Waiter() {
       .channel('waiter-tables')
       .on(
         'postgres_changes',
-        { event: '*', schema: 'public', table: 'tables' },
-        () => {
+        { event: 'UPDATE', schema: 'public', table: 'tables' },
+        (payload) => {
+          const newTable = payload.new as any;
+          const oldTable = payload.old as any;
+          
+          if (newTable.needs_waiter && !oldTable.needs_waiter) {
+            if (audioRef.current && soundEnabled) {
+              audioRef.current.play().catch(e => console.log('Audio blocked', e));
+            }
+          }
           fetchTablesCalling();
         }
       )
@@ -134,23 +152,50 @@ export default function Waiter() {
     navigate('/admin/login');
   };
 
+  const enableSound = () => {
+    setSoundEnabled(true);
+    if (audioRef.current) {
+      audioRef.current.play().catch(e => console.log('Audio blocked', e));
+    }
+  };
+
   return (
     <div className={`min-h-screen bg-${themeConfig.colors.background}`}>
+      <audio ref={audioRef} src="https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3" preload="auto" />
       <header className={`bg-${themeConfig.colors.surface} shadow-sm border-b border-slate-200 sticky top-0 z-10`}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <User size={24} className={`text-${themeConfig.colors.primary}`} />
             <h1 className={`text-xl font-bold text-${themeConfig.colors.text}`}>Garçom - {staffName}</h1>
           </div>
-          <button 
-            onClick={handleLogout}
-            className="flex items-center gap-2 text-slate-500 hover:text-red-600 transition-colors font-medium"
-          >
-            <LogOut size={20} />
-            <span className="hidden sm:inline">Sair</span>
-          </button>
+          <div className="flex items-center gap-4">
+            <button
+              onClick={() => setSoundEnabled(!soundEnabled)}
+              className={`p-2 rounded-full transition-colors ${soundEnabled ? 'bg-emerald-100 text-emerald-600' : 'bg-slate-100 text-slate-400'}`}
+              title={soundEnabled ? "Som ativado" : "Som desativado"}
+            >
+              {soundEnabled ? <Volume2 size={20} /> : <VolumeX size={20} />}
+            </button>
+            <button 
+              onClick={handleLogout}
+              className="flex items-center gap-2 text-slate-500 hover:text-red-600 transition-colors font-medium"
+            >
+              <LogOut size={20} />
+              <span className="hidden sm:inline">Sair</span>
+            </button>
+          </div>
         </div>
       </header>
+
+      {!soundEnabled && (
+        <div className="bg-blue-50 border-b border-blue-100 p-3 text-center text-blue-800 text-sm font-medium flex items-center justify-center gap-2">
+          <VolumeX size={16} />
+          As notificações sonoras estão desativadas.
+          <button onClick={enableSound} className="underline font-bold hover:text-blue-900">
+            Clique aqui para ativar o som
+          </button>
+        </div>
+      )}
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
         

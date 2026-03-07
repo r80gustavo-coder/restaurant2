@@ -11,6 +11,7 @@ export default function CustomerLayout() {
   const navigate = useNavigate();
   const [notification, setNotification] = useState<{title: string, message: string} | null>(null);
   const [isCallingWaiter, setIsCallingWaiter] = useState(false);
+  const [soundEnabled, setSoundEnabled] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   useEffect(() => {
@@ -57,7 +58,9 @@ export default function CustomerLayout() {
                 message: `Seu pedido agora está: ${statusMap[newOrder.status]}`
               });
               
-              audioRef.current?.play().catch(e => console.log('Audio blocked', e));
+              if (audioRef.current && soundEnabled) {
+                audioRef.current.play().catch(e => console.log('Audio blocked', e));
+              }
               
               setTimeout(() => {
                 setNotification(null);
@@ -96,6 +99,9 @@ export default function CustomerLayout() {
         title: 'Garçom Chamado',
         message: 'Um garçom está a caminho da sua mesa.'
       });
+      if (audioRef.current && soundEnabled) {
+        audioRef.current.play().catch(e => console.log('Audio blocked', e));
+      }
       setTimeout(() => setNotification(null), 5000);
     } catch (error) {
       console.error('Error calling waiter:', error);
@@ -105,8 +111,16 @@ export default function CustomerLayout() {
     }
   };
 
+  const enableSound = () => {
+    setSoundEnabled(true);
+    if (audioRef.current) {
+      audioRef.current.play().catch(e => console.log('Audio blocked', e));
+    }
+  };
+
   return (
-    <div className={`min-h-screen bg-${themeConfig.colors.background} flex flex-col pb-20`}>
+    <div className={`min-h-screen bg-${themeConfig.colors.background} flex flex-col pb-20`} onClick={() => { if (!soundEnabled) setSoundEnabled(true); }}>
+      <audio ref={audioRef} src="https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3" preload="auto" />
       {/* Header */}
       <header className={`bg-${themeConfig.colors.surface} shadow-sm px-4 py-4 sticky top-0 z-50 flex justify-between items-center`}>
         <div className="flex items-center gap-3">
@@ -142,7 +156,7 @@ export default function CustomerLayout() {
       <button
         onClick={handleCallWaiter}
         disabled={isCallingWaiter}
-        className={`fixed bottom-24 right-4 z-40 p-4 rounded-full shadow-lg flex items-center justify-center transition-all ${
+        className={`fixed bottom-40 right-6 z-40 w-14 h-14 rounded-full shadow-lg flex items-center justify-center transition-all ${
           isCallingWaiter 
             ? 'bg-slate-300 text-slate-500 scale-95' 
             : 'bg-red-500 hover:bg-red-600 text-white hover:scale-105 hover:shadow-xl'

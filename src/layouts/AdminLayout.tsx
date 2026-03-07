@@ -1,5 +1,5 @@
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, ShoppingBag, Package, Users, LogOut, Bell, Tag, Box, DollarSign, FileText, CheckCircle, AlertCircle, Clock, MessageSquare } from 'lucide-react';
+import { LayoutDashboard, ShoppingBag, Package, Users, LogOut, Bell, Tag, Box, DollarSign, FileText, CheckCircle, AlertCircle, Clock, MessageSquare, Volume2, VolumeX } from 'lucide-react';
 import { themeConfig } from '../config/theme';
 import { useEffect, useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -10,6 +10,7 @@ export default function AdminLayout() {
   const navigate = useNavigate();
   const [notifications, setNotifications] = useState<any[]>([]);
   const [showNotifications, setShowNotifications] = useState(false);
+  const [soundEnabled, setSoundEnabled] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   const [connectionStatus, setConnectionStatus] = useState('connecting');
@@ -80,7 +81,7 @@ export default function AdminLayout() {
               
               setNotifications(prev => [newNotification, ...prev]);
               
-              if (audioRef.current) {
+              if (audioRef.current && soundEnabled) {
                 audioRef.current.play().catch(e => console.log('Sound blocked until user interaction'));
               }
             }
@@ -108,7 +109,7 @@ export default function AdminLayout() {
             
             setNotifications(prev => [newNotification, ...prev]);
             
-            if (audioRef.current) {
+            if (audioRef.current && soundEnabled) {
               audioRef.current.play().catch(e => console.log('Sound blocked until user interaction'));
             }
           }
@@ -144,8 +145,16 @@ export default function AdminLayout() {
     setNotifications(prev => prev.map(n => ({ ...n, read: true })));
   };
 
+  const enableSound = () => {
+    setSoundEnabled(true);
+    if (audioRef.current) {
+      audioRef.current.play().catch(e => console.log('Audio blocked', e));
+    }
+  };
+
   return (
     <div className={`min-h-screen bg-${themeConfig.colors.background} flex`}>
+      <audio ref={audioRef} src="https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3" preload="auto" />
       {/* Sidebar */}
       <aside className={`w-64 bg-${themeConfig.colors.surface} border-r border-slate-200 flex flex-col fixed h-full z-20`}>
         <div className="p-6 flex items-center gap-3">
@@ -200,6 +209,14 @@ export default function AdminLayout() {
               </span>
             )}
             
+            <button
+              onClick={() => setSoundEnabled(!soundEnabled)}
+              className={`p-2 rounded-full transition-colors ${soundEnabled ? 'bg-emerald-100 text-emerald-600' : 'bg-slate-100 text-slate-400'}`}
+              title={soundEnabled ? "Som ativado" : "Som desativado"}
+            >
+              {soundEnabled ? <Volume2 size={20} /> : <VolumeX size={20} />}
+            </button>
+
             <button 
               onClick={() => {
                 setShowNotifications(!showNotifications);
@@ -273,6 +290,15 @@ export default function AdminLayout() {
         </header>
 
         {/* Page Content */}
+        {!soundEnabled && (
+          <div className="bg-blue-50 border-b border-blue-100 p-3 text-center text-blue-800 text-sm font-medium flex items-center justify-center gap-2">
+            <VolumeX size={16} />
+            As notificações sonoras estão desativadas.
+            <button onClick={enableSound} className="underline font-bold hover:text-blue-900">
+              Clique aqui para ativar o som
+            </button>
+          </div>
+        )}
         <div className="flex-1 overflow-auto p-8 relative">
           <Outlet />
 
