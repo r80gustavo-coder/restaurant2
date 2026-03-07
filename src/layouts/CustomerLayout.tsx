@@ -89,7 +89,7 @@ export default function CustomerLayout() {
         .channel(`customer-layout-online-${customerId}`)
         .on(
           'postgres_changes',
-          { event: 'UPDATE', schema: 'public', table: 'orders', filter: `customer_id=eq.${customerId}` },
+          { event: 'UPDATE', schema: 'public', table: 'orders', filter: `customer_id=eq.${parseInt(customerId)}` },
           (payload) => {
             const newOrder = payload.new as any;
             const oldOrder = payload.old as any;

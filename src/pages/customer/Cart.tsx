@@ -50,7 +50,7 @@ export default function Cart() {
       if (orderType === 'table' && tableId) {
         orderData.tableId = parseInt(tableId);
       } else if (orderType === 'online' && customerId) {
-        orderData.customer_id = customerId;
+        orderData.customer_id = parseInt(customerId);
         orderData.delivery_address = { full: address };
         orderData.payment_method = paymentMethod;
       }

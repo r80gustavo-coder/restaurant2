@@ -41,7 +41,7 @@ export default function OrderStatus() {
       if (orderType === 'table' && tableId) {
         query = query.eq('tableId', parseInt(tableId));
       } else if (orderType === 'online' && customerId) {
-        query = query.eq('customer_id', customerId);
+        query = query.eq('customer_id', parseInt(customerId));
       }
 
       const { data, error } = await query;
@@ -75,7 +75,7 @@ export default function OrderStatus() {
     if (orderType === 'table' && tableId) {
       filter = `tableId=eq.${tableId}`;
     } else if (orderType === 'online' && customerId) {
-      filter = `customer_id=eq.${customerId}`;
+      filter = `customer_id=eq.${parseInt(customerId)}`;
     }
 
     if (!filter) return;
