@@ -94,7 +94,7 @@ export default function Waiter() {
         { event: '*', schema: 'public', table: 'orders' },
         (payload) => {
           const newOrder = payload.new as any;
-          const oldStatus = payload.old?.status || orderStatusesRef.current[newOrder.id];
+          const oldStatus = (payload.old as any)?.status || orderStatusesRef.current[newOrder.id];
           
           if (payload.eventType === 'UPDATE' && newOrder.status === 'ready' && oldStatus !== 'ready') {
             if (audioRef.current && soundEnabledRef.current) {
@@ -117,7 +117,7 @@ export default function Waiter() {
         { event: 'UPDATE', schema: 'public', table: 'tables' },
         (payload) => {
           const newTable = payload.new as any;
-          const prevNeeds = payload.old?.needs_waiter ?? tableNeedsWaiterRef.current[newTable.id];
+          const prevNeeds = (payload.old as any)?.needs_waiter ?? tableNeedsWaiterRef.current[newTable.id];
           
           if (newTable.needs_waiter && !prevNeeds) {
             if (audioRef.current && soundEnabledRef.current) {

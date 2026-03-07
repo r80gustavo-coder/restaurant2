@@ -5,6 +5,8 @@ import { supabase } from '../lib/supabase';
 import { format } from 'date-fns';
 import { motion, AnimatePresence } from 'framer-motion';
 
+const MotionDiv = motion.div as any;
+
 export default function CustomerChat() {
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState<any[]>([]);
@@ -115,7 +117,7 @@ export default function CustomerChat() {
       {/* Chat Modal */}
       <AnimatePresence>
         {isOpen && (
-          <motion.div
+          <MotionDiv
             initial={{ opacity: 0, y: 100, scale: 0.9 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 100, scale: 0.9 }}
@@ -184,7 +186,7 @@ export default function CustomerChat() {
                 </button>
               </form>
             </div>
-          </motion.div>
+          </MotionDiv>
         )}
       </AnimatePresence>
     </>

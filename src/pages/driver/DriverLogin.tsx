@@ -3,16 +3,15 @@ import { useNavigate } from 'react-router-dom';
 import { themeConfig } from '../../config/theme';
 import { supabase } from '../../lib/supabase';
 import { motion } from 'framer-motion';
-import { Phone, User, MapPin } from 'lucide-react';
+import { Bike, Phone, User } from 'lucide-react';
 
 const MotionDiv = motion.div as any;
 
-export default function OnlineLogin() {
+export default function DriverLogin() {
   const navigate = useNavigate();
   const [mode, setMode] = useState<'login' | 'register'>('login');
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
-  const [address, setAddress] = useState('');
   const [loading, setLoading] = useState(false);
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -21,25 +20,27 @@ export default function OnlineLogin() {
 
     setLoading(true);
     try {
-      const { data: customer, error } = await supabase
-        .from('customers')
+      const { data: driver, error } = await supabase
+        .from('drivers')
         .select('*')
         .eq('phone', phone)
         .single();
 
-      if (error || !customer) {
-        alert('Cliente não encontrado. Por favor, faça o cadastro.');
+      if (error || !driver) {
+        alert('Motorista não encontrado. Por favor, faça o cadastro.');
         setMode('register');
         return;
       }
 
-      sessionStorage.setItem('orderType', 'online');
-      sessionStorage.setItem('customerId', customer.id);
-      sessionStorage.setItem('customerName', customer.name);
-      sessionStorage.setItem('customerPhone', customer.phone);
-      sessionStorage.setItem('customerAddress', customer.address?.full || '');
+      if (driver.status === 'inactive') {
+        alert('Seu cadastro está inativo. Entre em contato com o restaurante.');
+        return;
+      }
+
+      localStorage.setItem('driverId', driver.id);
+      localStorage.setItem('driverName', driver.name);
       
-      navigate('/');
+      navigate('/driver/dashboard');
     } catch (error) {
       console.error('Login error:', error);
       alert('Erro ao fazer login. Tente novamente.');
@@ -50,12 +51,12 @@ export default function OnlineLogin() {
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name || !phone || !address) return;
+    if (!name || !phone) return;
 
     setLoading(true);
     try {
-      let { data: customer, error: fetchError } = await supabase
-        .from('customers')
+      let { data: driver, error: fetchError } = await supabase
+        .from('drivers')
         .select('*')
         .eq('phone', phone)
         .single();
@@ -64,29 +65,26 @@ export default function OnlineLogin() {
         throw fetchError;
       }
 
-      if (!customer) {
-        const { data: newCustomer, error: insertError } = await supabase
-          .from('customers')
-          .insert([{ name, phone, address: { full: address } }])
+      if (!driver) {
+        const { data: newDriver, error: insertError } = await supabase
+          .from('drivers')
+          .insert([{ name, phone, status: 'active' }])
           .select()
           .single();
         
         if (insertError) throw insertError;
-        customer = newCustomer;
+        driver = newDriver;
       } else {
         await supabase
-          .from('customers')
-          .update({ name, address: { full: address } })
-          .eq('id', customer.id);
+          .from('drivers')
+          .update({ name, status: 'active' })
+          .eq('id', driver.id);
       }
 
-      sessionStorage.setItem('orderType', 'online');
-      sessionStorage.setItem('customerId', customer.id);
-      sessionStorage.setItem('customerName', name);
-      sessionStorage.setItem('customerPhone', phone);
-      sessionStorage.setItem('customerAddress', address);
+      localStorage.setItem('driverId', driver.id);
+      localStorage.setItem('driverName', name);
       
-      navigate('/');
+      navigate('/driver/dashboard');
     } catch (error) {
       console.error('Register error:', error);
       alert('Erro ao realizar cadastro. Tente novamente.');
@@ -103,9 +101,11 @@ export default function OnlineLogin() {
         className={`w-full max-w-md bg-${themeConfig.colors.surface} p-8 rounded-[2rem] shadow-sm border border-slate-100`}
       >
         <div className="text-center mb-8">
-          <img src={themeConfig.logo} alt="Logo" className="w-20 h-20 rounded-2xl mx-auto mb-4 object-cover" referrerPolicy="no-referrer" />
-          <h1 className={`text-2xl font-bold text-${themeConfig.colors.text} mb-2`}>Delivery & Retirada</h1>
-          <p className={`text-${themeConfig.colors.textMuted}`}>Faça seu pedido online</p>
+          <div className={`w-20 h-20 bg-${themeConfig.colors.primary}/10 rounded-2xl mx-auto mb-4 flex items-center justify-center text-${themeConfig.colors.primary}`}>
+            <Bike size={40} />
+          </div>
+          <h1 className={`text-2xl font-bold text-${themeConfig.colors.text} mb-2`}>Portal do Entregador</h1>
+          <p className={`text-${themeConfig.colors.textMuted}`}>Acesse para ver as entregas disponíveis</p>
         </div>
 
         <div className="flex mb-6 bg-slate-100 p-1 rounded-xl">
@@ -156,29 +156,12 @@ export default function OnlineLogin() {
             </div>
           </div>
 
-          {mode === 'register' && (
-            <div>
-              <label className={`block text-sm font-medium text-${themeConfig.colors.text} mb-1.5`}>Endereço de Entrega</label>
-              <div className="relative">
-                <MapPin className={`absolute left-4 top-1/2 -translate-y-1/2 text-${themeConfig.colors.textMuted}`} size={20} />
-                <input
-                  type="text"
-                  required
-                  value={address}
-                  onChange={(e) => setAddress(e.target.value)}
-                  className={`w-full pl-12 pr-4 py-3.5 rounded-2xl bg-slate-50 border border-slate-200 focus:bg-white focus:border-${themeConfig.colors.primary} focus:ring-2 focus:ring-${themeConfig.colors.primary}/20 outline-none transition-all`}
-                  placeholder="Rua, Número, Bairro"
-                />
-              </div>
-            </div>
-          )}
-
           <button
             type="submit"
             disabled={loading}
             className={`w-full py-4 rounded-2xl bg-${themeConfig.colors.primary} text-white font-bold text-lg shadow-lg shadow-${themeConfig.colors.primary}/30 active:scale-[0.98] transition-all disabled:opacity-70 mt-4`}
           >
-            {loading ? 'Aguarde...' : mode === 'login' ? 'Entrar' : 'Começar Pedido'}
+            {loading ? 'Aguarde...' : mode === 'login' ? 'Entrar' : 'Cadastrar'}
           </button>
         </form>
       </MotionDiv>

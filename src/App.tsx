@@ -21,6 +21,8 @@ import Tables from './pages/admin/Tables';
 import Staff from './pages/admin/Staff';
 import Kitchen from './pages/admin/Kitchen';
 import Waiter from './pages/admin/Waiter';
+import Marketing from './pages/admin/Marketing';
+import Drivers from './pages/admin/Drivers';
 
 // Customer Pages
 import Menu from './pages/customer/Menu';
@@ -28,6 +30,11 @@ import Cart from './pages/customer/Cart';
 import OrderStatus from './pages/customer/OrderStatus';
 import TableLogin from './pages/customer/TableLogin';
 import OnlineLogin from './pages/customer/OnlineLogin';
+import PixPayment from './pages/customer/PixPayment';
+
+// Driver Pages
+import DriverLogin from './pages/driver/DriverLogin';
+import DriverDashboard from './pages/driver/DriverDashboard';
 
 export default function App() {
   useEffect(() => {
@@ -106,7 +113,13 @@ export default function App() {
           <Route path="reports" element={<Reports />} />
           <Route path="chat" element={<Chat />} />
           <Route path="staff" element={<Staff />} />
+          <Route path="drivers" element={<Drivers />} />
+          <Route path="marketing" element={<Marketing />} />
         </Route>
+
+        {/* Driver Routes */}
+        <Route path="/driver/login" element={<DriverLogin />} />
+        <Route path="/driver/dashboard" element={<DriverDashboard />} />
 
         {/* Customer Routes */}
         <Route path="/login" element={<TableLogin />} />
@@ -115,6 +128,7 @@ export default function App() {
           <Route index element={<Menu />} />
           <Route path="cart" element={<Cart />} />
           <Route path="status" element={<OrderStatus />} />
+          <Route path="pix-payment/:orderId" element={<PixPayment />} />
         </Route>
       </Routes>
     </BrowserRouter>

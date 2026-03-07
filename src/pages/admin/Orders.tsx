@@ -22,6 +22,10 @@ export default function Orders() {
             phone,
             address
           ),
+          driver:drivers (
+            name,
+            phone
+          ),
           items:order_items (
             id,
             quantity,
@@ -44,6 +48,8 @@ export default function Orders() {
         tableNumber: order.table?.number,
         customerName: order.customer?.name,
         customerPhone: order.customer?.phone,
+        driverName: order.driver?.name,
+        driverPhone: order.driver?.phone,
         deliveryAddress: order.delivery_address?.full || order.customer?.address?.full,
         items: order.items.map((item: any) => ({
           ...item,
@@ -149,6 +155,7 @@ export default function Orders() {
       case 'pending': return 'bg-orange-100 text-orange-700 border-orange-200';
       case 'preparing': return 'bg-blue-100 text-blue-700 border-blue-200';
       case 'ready': return 'bg-emerald-100 text-emerald-700 border-emerald-200';
+      case 'out_for_delivery': return 'bg-blue-100 text-blue-700 border-blue-200';
       case 'delivered': return 'bg-slate-100 text-slate-700 border-slate-200';
       case 'cancelled': return 'bg-red-100 text-red-700 border-red-200';
       default: return 'bg-slate-100 text-slate-700 border-slate-200';
@@ -160,6 +167,7 @@ export default function Orders() {
       case 'pending': return 'Pendente';
       case 'preparing': return 'Preparando';
       case 'ready': return 'Pronto';
+      case 'out_for_delivery': return 'Em Rota';
       case 'delivered': return 'Entregue';
       case 'cancelled': return 'Cancelado';
       default: return status;
@@ -173,6 +181,8 @@ export default function Orders() {
         <div className="flex gap-2">
           <span className="px-3 py-1 rounded-full bg-orange-100 text-orange-700 text-sm font-medium">Pendentes ({orders.filter(o => o.status === 'pending').length})</span>
           <span className="px-3 py-1 rounded-full bg-blue-100 text-blue-700 text-sm font-medium">Preparando ({orders.filter(o => o.status === 'preparing').length})</span>
+          <span className="px-3 py-1 rounded-full bg-emerald-100 text-emerald-700 text-sm font-medium">Prontos ({orders.filter(o => o.status === 'ready').length})</span>
+          <span className="px-3 py-1 rounded-full bg-blue-100 text-blue-700 text-sm font-medium">Em Rota ({orders.filter(o => o.status === 'out_for_delivery').length})</span>
         </div>
       </div>
 
@@ -243,7 +253,7 @@ export default function Orders() {
                       <Check size={18} /> Pronto
                     </button>
                   )}
-                  {order.status === 'ready' && (
+                  {(order.status === 'ready' || order.status === 'out_for_delivery') && (
                     <button 
                       onClick={() => updateStatus(order.id, 'delivered')}
                       className="flex items-center gap-2 px-4 py-2 bg-slate-800 text-white rounded-xl hover:bg-slate-900 transition-colors font-medium"
@@ -275,6 +285,12 @@ export default function Orders() {
                     <p className="text-sm text-slate-600"><strong>Cliente:</strong> {order.customerName}</p>
                     <p className="text-sm text-slate-600"><strong>Telefone:</strong> {order.customerPhone}</p>
                     <p className="text-sm text-slate-600"><strong>Endereço:</strong> {order.deliveryAddress}</p>
+                    {order.driverName && (
+                      <div className="mt-3 pt-3 border-t border-slate-100">
+                        <p className="text-sm text-slate-600"><strong>Entregador:</strong> {order.driverName}</p>
+                        <p className="text-sm text-slate-600"><strong>Contato:</strong> {order.driverPhone}</p>
+                      </div>
+                    )}
                   </div>
                 )}
                 <h4 className={`font-semibold text-${themeConfig.colors.text} mb-4`}>Itens do Pedido</h4>

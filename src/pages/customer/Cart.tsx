@@ -89,17 +89,31 @@ export default function Cart() {
 
       // 4. Handle Stripe Payment
       if (orderType === 'online' && paymentMethod === 'stripe') {
-        const response = await axios.post('/api/stripe/create-checkout-session', {
-          items: cart,
-          orderId: order.id,
-          successUrl: `${window.location.origin}/status`,
-          cancelUrl: `${window.location.origin}/cart`
-        });
-        
-        await supabase.from('orders').update({ stripe_session_id: response.data.id }).eq('id', order.id);
-        
+        try {
+          const response = await axios.post('/api/stripe/create-checkout-session', {
+            items: cart,
+            orderId: order.id,
+            successUrl: `${window.location.origin}/status`,
+            cancelUrl: `${window.location.origin}/cart`
+          });
+          
+          await supabase.from('orders').update({ stripe_session_id: response.data.id }).eq('id', order.id);
+          
+          sessionStorage.removeItem('cart');
+          window.location.href = response.data.url;
+          return;
+        } catch (error) {
+          console.error('Stripe error:', error);
+          // Fallback to status page if stripe fails in preview
+          sessionStorage.removeItem('cart');
+          navigate('/status');
+          return;
+        }
+      }
+
+      if (orderType === 'online' && paymentMethod === 'pix') {
         sessionStorage.removeItem('cart');
-        window.location.href = response.data.url;
+        navigate(`/pix-payment/${order.id}`);
         return;
       }
 
@@ -174,7 +188,7 @@ export default function Cart() {
         {orderType === 'online' && (
           <div className="mb-4">
             <h4 className={`text-sm font-bold text-${themeConfig.colors.text} mb-2 px-2`}>Forma de Pagamento</h4>
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-2 gap-2">
               <button
                 onClick={() => setPaymentMethod('stripe')}
                 className={`flex flex-col items-center justify-center p-3 rounded-xl border-2 transition-all ${
@@ -196,17 +210,6 @@ export default function Cart() {
               >
                 <Smartphone size={24} className="mb-1" />
                 <span className="text-xs font-bold">Pix</span>
-              </button>
-              <button
-                onClick={() => setPaymentMethod('cash')}
-                className={`flex flex-col items-center justify-center p-3 rounded-xl border-2 transition-all ${
-                  paymentMethod === 'cash' 
-                    ? `border-${themeConfig.colors.primary} bg-${themeConfig.colors.primary}/5 text-${themeConfig.colors.primary}` 
-                    : 'border-slate-100 bg-slate-50 text-slate-500 hover:bg-slate-100'
-                }`}
-              >
-                <Banknote size={24} className="mb-1" />
-                <span className="text-xs font-bold">Dinheiro</span>
               </button>
             </div>
           </div>

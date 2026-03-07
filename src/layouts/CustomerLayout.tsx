@@ -4,6 +4,8 @@ import { themeConfig } from '../config/theme';
 import { useEffect, useState, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import { motion, AnimatePresence } from 'framer-motion';
+
+const MotionDiv = motion.div as any;
 import CustomerChat from '../components/CustomerChat';
 
 export default function CustomerLayout() {
@@ -236,7 +238,7 @@ export default function CustomerLayout() {
       {/* Notification Toast */}
       <AnimatePresence>
         {notification && (
-          <motion.div
+          <MotionDiv
             initial={{ opacity: 0, y: -50, x: '-50%' }}
             animate={{ opacity: 1, y: 0, x: '-50%' }}
             exit={{ opacity: 0, y: -50, x: '-50%' }}
@@ -249,7 +251,7 @@ export default function CustomerLayout() {
               <h4 className={`font-bold text-${themeConfig.colors.text} text-sm`}>{notification.title}</h4>
               <p className={`text-${themeConfig.colors.textMuted} text-xs mt-1`}>{notification.message}</p>
             </div>
-          </motion.div>
+          </MotionDiv>
         )}
       </AnimatePresence>
 
