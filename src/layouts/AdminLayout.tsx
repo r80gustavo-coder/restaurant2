@@ -39,8 +39,18 @@ export default function AdminLayout() {
     });
 
     const fetchTableNumber = async (tableId: number) => {
-      const { data } = await supabase.from('tables').select('number').eq('id', tableId).single();
-      return data?.number || '?';
+      if (!tableId) return 'Balcão';
+      try {
+        const { data, error } = await supabase.from('tables').select('number').eq('id', tableId).single();
+        if (error) {
+          console.error('Error fetching table number:', error);
+          return '?';
+        }
+        return data?.number || '?';
+      } catch (err) {
+        console.error('Exception fetching table number:', err);
+        return '?';
+      }
     };
 
     // Create a unique channel name to avoid conflicts
@@ -73,6 +83,7 @@ export default function AdminLayout() {
               }
             } else if (payload.eventType === 'UPDATE') {
               const oldStatus = payload.old?.status || prevStatus;
+              console.log('Order Update:', { id: order.id, new: order.status, old: oldStatus });
               // Only notify if status changed
               if (order.status && order.status !== oldStatus && order.status !== 'chat_read' && order.status !== 'chat_unread') {
                 const tableNum = await fetchTableNumber(order.tableId);
@@ -116,6 +127,7 @@ export default function AdminLayout() {
         'postgres_changes',
         { event: 'UPDATE', schema: 'public', table: 'tables' },
         (payload) => {
+          console.log('🔔 TABLE EVENT RECEIVED:', payload);
           const newTable = payload.new as any;
           const prevNeeds = payload.old?.needs_waiter ?? tableNeedsWaiterRef.current[newTable.id];
           
@@ -238,6 +250,28 @@ export default function AdminLayout() {
               title={soundEnabled ? "Som ativado" : "Som desativado"}
             >
               {soundEnabled ? <Volume2 size={20} /> : <VolumeX size={20} />}
+            </button>
+
+            {/* TEST BUTTON - REMOVE LATER */}
+            <button
+              onClick={() => {
+                const newNotification = {
+                  id: Date.now(),
+                  title: 'Teste de Notificação',
+                  message: 'Se você está vendo isso, a interface está funcionando!',
+                  time: new Date(),
+                  type: 'success',
+                  read: false
+                };
+                setNotifications(prev => [newNotification, ...prev]);
+                if (audioRef.current && soundEnabled) {
+                  audioRef.current.play().catch(e => console.log('Audio blocked', e));
+                }
+              }}
+              className="p-2 rounded-full bg-purple-100 text-purple-600 hover:bg-purple-200 transition-colors text-xs font-bold"
+              title="Testar Notificação"
+            >
+              TESTE
             </button>
 
             <button 
