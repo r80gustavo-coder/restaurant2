@@ -57,93 +57,116 @@ export const supabase = {
       return { data: { subscription: { unsubscribe: () => {} } } };
     }
   },
-  from: (table: string) => ({
-    select: (query?: string) => {
-      return {
-        eq: async (column: string, value: any) => {
-          // This is a very simplified mock. In a real migration, you'd replace all supabase.from() calls with api.get() calls.
-          try {
-            const res = await api.get(`/${table}?${column}=${value}`);
-            return { data: res.data, error: null };
-          } catch (error: any) {
-            return { data: null, error: error.response?.data || error };
-          }
-        },
-        order: async (column: string, options?: any) => {
-          try {
-            const res = await api.get(`/${table}?orderBy=${column}&ascending=${options?.ascending !== false}`);
-            return { data: res.data, error: null };
-          } catch (error: any) {
-            return { data: null, error: error.response?.data || error };
-          }
-        },
-        single: async () => {
-           try {
-            const res = await api.get(`/${table}`);
-            return { data: res.data[0] || null, error: null };
-          } catch (error: any) {
-            return { data: null, error: error.response?.data || error };
-          }
-        },
-        then: async (resolve: any, reject: any) => {
-           try {
-            const res = await api.get(`/${table}`);
-            resolve({ data: res.data, error: null });
-          } catch (error: any) {
-            resolve({ data: null, error: error.response?.data || error });
-          }
-        }
-      };
-    },
-    insert: (data: any) => {
-      return {
-        select: () => {
-          return {
-            single: async () => {
-              try {
-                const res = await api.post(`/${table}`, data);
-                return { data: res.data, error: null };
-              } catch (error: any) {
-                return { data: null, error: error.response?.data || error };
-              }
-            }
-          }
-        },
-        then: async (resolve: any) => {
-           try {
-            const res = await api.post(`/${table}`, data);
-            resolve({ data: res.data, error: null });
-          } catch (error: any) {
-            resolve({ data: null, error: error.response?.data || error });
-          }
-        }
-      };
-    },
-    update: (data: any) => {
-      return {
-        eq: async (column: string, value: any) => {
-           try {
-            const res = await api.patch(`/${table}/${value}`, data);
-            return { data: res.data, error: null };
-          } catch (error: any) {
-            return { data: null, error: error.response?.data || error };
-          }
-        }
-      };
-    },
-    delete: () => {
-      return {
-        eq: async (column: string, value: any) => {
-           try {
-            const res = await api.delete(`/${table}/${value}`);
-            return { data: res.data, error: null };
-          } catch (error: any) {
-            return { data: null, error: error.response?.data || error };
-          }
-        }
-      };
+  rpc: async (name: string, params: any) => {
+    try {
+      const res = await api.post(`/rpc/${name}`, params);
+      return { data: res.data, error: null };
+    } catch (error: any) {
+      return { data: null, error: error.response?.data || error };
     }
-  }),
+  },
+  from: (table: string) => {
+    const chain: any = {
+      select: (query?: string) => chain,
+      eq: (column: string, value: any) => chain,
+      neq: (column: string, value: any) => chain,
+      in: (column: string, values: any[]) => chain,
+      not: (column: string, operator: string, value: any) => chain,
+      order: (column: string, options?: any) => chain,
+      limit: (count: number) => chain,
+      single: () => chain,
+      insert: (data: any) => chain,
+      update: (data: any) => chain,
+      delete: () => chain,
+      then: async (resolve: any, reject: any) => {
+        try {
+          // In a real implementation, we would build the query string based on the chain methods
+          const res = await api.get(`/${table}`);
+          if (resolve) resolve({ data: res.data, error: null });
+          return { data: res.data, error: null };
+        } catch (error: any) {
+          if (resolve) resolve({ data: null, error: error.response?.data || error });
+          return { data: null, error: error.response?.data || error };
+        }
+      }
+    };
+
+    // Override some methods to actually perform actions if they are terminal
+    chain.single = async () => {
+      try {
+        const res = await api.get(`/${table}`);
+        return { data: res.data[0] || null, error: null };
+      } catch (error: any) {
+        return { data: null, error: error.response?.data || error };
+      }
+    };
+
+    chain.eq = (column: string, value: any) => {
+      const originalThen = chain.then;
+      chain.then = async (resolve: any) => {
+        try {
+          const res = await api.get(`/${table}?${column}=${value}`);
+          if (resolve) resolve({ data: res.data, error: null });
+          return { data: res.data, error: null };
+        } catch (error: any) {
+          if (resolve) resolve({ data: null, error: error.response?.data || error });
+          return { data: null, error: error.response?.data || error };
+        }
+      };
+      return chain;
+    };
+
+    chain.insert = (data: any) => {
+      chain.then = async (resolve: any) => {
+        try {
+          const res = await api.post(`/${table}`, data);
+          if (resolve) resolve({ data: res.data, error: null });
+          return { data: res.data, error: null };
+        } catch (error: any) {
+          if (resolve) resolve({ data: null, error: error.response?.data || error });
+          return { data: null, error: error.response?.data || error };
+        }
+      };
+      return chain;
+    };
+
+    chain.update = (data: any) => {
+      const originalEq = chain.eq;
+      chain.eq = (column: string, value: any) => {
+        chain.then = async (resolve: any) => {
+          try {
+            const res = await api.patch(`/${table}/${value}`, data);
+            if (resolve) resolve({ data: res.data, error: null });
+            return { data: res.data, error: null };
+          } catch (error: any) {
+            if (resolve) resolve({ data: null, error: error.response?.data || error });
+            return { data: null, error: error.response?.data || error };
+          }
+        };
+        return chain;
+      };
+      return chain;
+    };
+
+    chain.delete = () => {
+      chain.eq = (column: string, value: any) => {
+        chain.then = async (resolve: any) => {
+          try {
+            const res = await api.delete(`/${table}/${value}`);
+            if (resolve) resolve({ data: res.data, error: null });
+            return { data: res.data, error: null };
+          } catch (error: any) {
+            if (resolve) resolve({ data: null, error: error.response?.data || error });
+            return { data: null, error: error.response?.data || error };
+          }
+        };
+        return chain;
+      };
+      return chain;
+    };
+
+    return chain;
+  },
   channel: (name: string) => {
     const s = getSocket();
     return {
@@ -160,10 +183,10 @@ export const supabase = {
         }
         return {
           on: (e: string, f: any, cb: any) => supabase.channel(name).on(e, f, cb),
-          subscribe: () => {}
+          subscribe: (cb?: any) => { if (cb) cb('SUBSCRIBED'); }
         };
       },
-      subscribe: () => {}
+      subscribe: (cb?: any) => { if (cb) cb('SUBSCRIBED'); }
     };
   },
   removeChannel: (channel: any) => {

@@ -257,35 +257,32 @@ async function startServer() {
   });
 
   // Serve Vite in development or static files in production
-  if (process.env.NODE_ENV !== 'production') {
+  const isProd = process.env.NODE_ENV === 'production';
+  const distPath = path.join(__dirname, 'dist');
+  const hasDist = fs.existsSync(distPath);
+
+  if (!isProd || !hasDist) {
+    if (isProd && !hasDist) {
+      console.warn('AVISO: NODE_ENV=production mas pasta "dist" não encontrada. Usando Vite middleware...');
+    }
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: 'spa',
     });
     app.use(vite.middlewares);
   } else {
-    const distPath = path.join(__dirname, 'dist');
+    console.log('Servindo arquivos estáticos de: ' + distPath);
+    app.use(express.static(distPath));
     
-    if (fs.existsSync(distPath)) {
-      console.log('Servindo arquivos estáticos de: ' + distPath);
-      app.use(express.static(distPath));
-      
-      app.get('*', (req, res) => {
-        if (req.path.startsWith('/api')) {
-          return res.status(404).json({ error: 'API route not found' });
-        }
-        res.sendFile(path.join(distPath, 'index.html'));
-      });
-    } else {
-      console.error('ERRO CRÍTICO: Pasta "dist" não encontrada!');
-      console.error('Você rodou "npm run build" antes de iniciar o servidor?');
-      app.get('*', (req, res) => {
-        res.status(500).send('<h1>Erro no Servidor</h1><p>A pasta "dist" não foi encontrada. Por favor, execute <code>npm run build</code> no servidor.</p>');
-      });
-    }
+    app.get('*', (req, res) => {
+      if (req.path.startsWith('/api')) {
+        return res.status(404).json({ error: 'API route not found' });
+      }
+      res.sendFile(path.join(distPath, 'index.html'));
+    });
   }
 
-  server.listen(PORT, '0.0.0.0', () => {
+  server.listen(Number(PORT), '0.0.0.0', () => {
     console.log('Servidor rodando na porta ' + PORT);
   });
 }
