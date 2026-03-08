@@ -7,7 +7,7 @@ import { createServer as createViteServer } from 'vite';
 import fs from 'fs';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
-import { initDb, getDb } from './server/db.js';
+import { initDb, getDb } from './db.js';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 
