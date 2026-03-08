@@ -17,12 +17,12 @@ export default function Orders() {
           table:tables (
             number
           ),
-          customer:customers (
+          customers (
             name,
             phone,
             address
           ),
-          driver:drivers (
+          drivers (
             name,
             phone
           ),
@@ -46,16 +46,16 @@ export default function Orders() {
       const formattedOrders = data?.map(order => ({
         ...order,
         tableNumber: order.table?.number,
-        customerName: order.customer?.name,
-        customerPhone: order.customer?.phone,
-        driverName: order.driver?.name,
-        driverPhone: order.driver?.phone,
-        deliveryAddress: order.delivery_address?.full || order.customer?.address?.full,
-        items: order.items.map((item: any) => ({
+        customerName: order.customers?.name,
+        customerPhone: order.customers?.phone,
+        driverName: order.drivers?.name,
+        driverPhone: order.drivers?.phone,
+        deliveryAddress: order.delivery_address?.full || order.customers?.address?.full,
+        items: order.items?.map((item: any) => ({
           ...item,
           name: item.product?.name,
           price: item.product?.price
-        }))
+        })) || []
       }));
 
       setOrders(formattedOrders || []);

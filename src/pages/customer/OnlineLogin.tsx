@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { themeConfig } from '../../config/theme';
 import { supabase } from '../../lib/supabase';
 import { motion } from 'framer-motion';
-import { Phone, User, MapPin } from 'lucide-react';
+import { Phone, User, MapPin, Mail, Lock } from 'lucide-react';
 
 const MotionDiv = motion.div as any;
 
@@ -11,20 +11,32 @@ export default function OnlineLogin() {
   const navigate = useNavigate();
   const [mode, setMode] = useState<'login' | 'register'>('login');
   const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [phone, setPhone] = useState('');
   const [address, setAddress] = useState('');
   const [loading, setLoading] = useState(false);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!phone) return;
+    if (!email || !password) return;
 
     setLoading(true);
     try {
+      const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+
+      if (authError) {
+        alert('Email ou senha inválidos.');
+        return;
+      }
+
       const { data: customer, error } = await supabase
         .from('customers')
         .select('*')
-        .eq('phone', phone)
+        .eq('email', email)
         .single();
 
       if (error || !customer) {
@@ -50,43 +62,48 @@ export default function OnlineLogin() {
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name || !phone || !address) return;
+    if (!name || !email || !password || !phone || !address) return;
 
     setLoading(true);
     try {
-      let { data: customer, error: fetchError } = await supabase
+      // Check if email is already taken
+      const { data: existingCustomer } = await supabase
         .from('customers')
-        .select('*')
-        .eq('phone', phone)
+        .select('id')
+        .eq('email', email)
         .single();
 
-      if (fetchError && fetchError.code !== 'PGRST116') {
-        throw fetchError;
+      if (existingCustomer) {
+        alert('Este email já está cadastrado. Por favor, faça login.');
+        setMode('login');
+        return;
       }
 
-      if (!customer) {
-        const { data: newCustomer, error: insertError } = await supabase
-          .from('customers')
-          .insert([{ name, phone, address: { full: address } }])
-          .select()
-          .single();
-        
-        if (insertError) throw insertError;
-        customer = newCustomer;
-      } else {
-        await supabase
-          .from('customers')
-          .update({ name, address: { full: address } })
-          .eq('id', customer.id);
+      const { data: authData, error: authError } = await supabase.auth.signUp({
+        email,
+        password,
+      });
+
+      if (authError) {
+        if (authError.message.includes('already registered')) {
+          alert('Este email já está cadastrado. Por favor, faça login.');
+          setMode('login');
+        } else {
+          alert('Erro ao criar usuário: ' + authError.message);
+        }
+        return;
       }
 
-      sessionStorage.setItem('orderType', 'online');
-      sessionStorage.setItem('customerId', customer.id);
-      sessionStorage.setItem('customerName', name);
-      sessionStorage.setItem('customerPhone', phone);
-      sessionStorage.setItem('customerAddress', address);
+      const { data: newCustomer, error: insertError } = await supabase
+        .from('customers')
+        .insert([{ name, email, phone, address: { full: address } }])
+        .select()
+        .single();
       
-      navigate('/');
+      if (insertError) throw insertError;
+
+      alert('Cadastro realizado com sucesso! Verifique seu email para confirmar a conta, ou faça login se a confirmação não for exigida.');
+      setMode('login');
     } catch (error) {
       console.error('Register error:', error);
       alert('Erro ao realizar cadastro. Tente novamente.');
@@ -142,35 +159,66 @@ export default function OnlineLogin() {
           )}
 
           <div>
-            <label className={`block text-sm font-medium text-${themeConfig.colors.text} mb-1.5`}>WhatsApp</label>
+            <label className={`block text-sm font-medium text-${themeConfig.colors.text} mb-1.5`}>Email</label>
             <div className="relative">
-              <Phone className={`absolute left-4 top-1/2 -translate-y-1/2 text-${themeConfig.colors.textMuted}`} size={20} />
+              <Mail className={`absolute left-4 top-1/2 -translate-y-1/2 text-${themeConfig.colors.textMuted}`} size={20} />
               <input
-                type="tel"
+                type="email"
                 required
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
                 className={`w-full pl-12 pr-4 py-3.5 rounded-2xl bg-slate-50 border border-slate-200 focus:bg-white focus:border-${themeConfig.colors.primary} focus:ring-2 focus:ring-${themeConfig.colors.primary}/20 outline-none transition-all`}
-                placeholder="(00) 00000-0000"
+                placeholder="seu@email.com"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className={`block text-sm font-medium text-${themeConfig.colors.text} mb-1.5`}>Senha</label>
+            <div className="relative">
+              <Lock className={`absolute left-4 top-1/2 -translate-y-1/2 text-${themeConfig.colors.textMuted}`} size={20} />
+              <input
+                type="password"
+                required
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className={`w-full pl-12 pr-4 py-3.5 rounded-2xl bg-slate-50 border border-slate-200 focus:bg-white focus:border-${themeConfig.colors.primary} focus:ring-2 focus:ring-${themeConfig.colors.primary}/20 outline-none transition-all`}
+                placeholder="Sua senha"
               />
             </div>
           </div>
 
           {mode === 'register' && (
-            <div>
-              <label className={`block text-sm font-medium text-${themeConfig.colors.text} mb-1.5`}>Endereço de Entrega</label>
-              <div className="relative">
-                <MapPin className={`absolute left-4 top-1/2 -translate-y-1/2 text-${themeConfig.colors.textMuted}`} size={20} />
-                <input
-                  type="text"
-                  required
-                  value={address}
-                  onChange={(e) => setAddress(e.target.value)}
-                  className={`w-full pl-12 pr-4 py-3.5 rounded-2xl bg-slate-50 border border-slate-200 focus:bg-white focus:border-${themeConfig.colors.primary} focus:ring-2 focus:ring-${themeConfig.colors.primary}/20 outline-none transition-all`}
-                  placeholder="Rua, Número, Bairro"
-                />
+            <>
+              <div>
+                <label className={`block text-sm font-medium text-${themeConfig.colors.text} mb-1.5`}>WhatsApp</label>
+                <div className="relative">
+                  <Phone className={`absolute left-4 top-1/2 -translate-y-1/2 text-${themeConfig.colors.textMuted}`} size={20} />
+                  <input
+                    type="tel"
+                    required
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                    className={`w-full pl-12 pr-4 py-3.5 rounded-2xl bg-slate-50 border border-slate-200 focus:bg-white focus:border-${themeConfig.colors.primary} focus:ring-2 focus:ring-${themeConfig.colors.primary}/20 outline-none transition-all`}
+                    placeholder="(00) 00000-0000"
+                  />
+                </div>
               </div>
-            </div>
+              <div>
+                <label className={`block text-sm font-medium text-${themeConfig.colors.text} mb-1.5`}>Endereço de Entrega</label>
+                <div className="relative">
+                  <MapPin className={`absolute left-4 top-1/2 -translate-y-1/2 text-${themeConfig.colors.textMuted}`} size={20} />
+                  <input
+                    type="text"
+                    required
+                    value={address}
+                    onChange={(e) => setAddress(e.target.value)}
+                    className={`w-full pl-12 pr-4 py-3.5 rounded-2xl bg-slate-50 border border-slate-200 focus:bg-white focus:border-${themeConfig.colors.primary} focus:ring-2 focus:ring-${themeConfig.colors.primary}/20 outline-none transition-all`}
+                    placeholder="Rua, Número, Bairro"
+                  />
+                </div>
+              </div>
+            </>
           )}
 
           <button

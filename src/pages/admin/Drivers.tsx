@@ -147,10 +147,23 @@ export default function Drivers() {
               <span className={`px-3 py-1 rounded-full text-xs font-bold ${
                 driver.status === 'active' 
                   ? 'bg-emerald-100 text-emerald-700' 
+                  : driver.status === 'pending'
+                  ? 'bg-orange-100 text-orange-700'
                   : 'bg-slate-100 text-slate-600'
               }`}>
-                {driver.status === 'active' ? 'Ativo' : 'Inativo'}
+                {driver.status === 'active' ? 'Ativo' : driver.status === 'pending' ? 'Pendente' : 'Inativo'}
               </span>
+              {driver.status === 'pending' && (
+                <button
+                  onClick={async () => {
+                    await supabase.from('drivers').update({ status: 'active' }).eq('id', driver.id);
+                    fetchDrivers();
+                  }}
+                  className="px-3 py-1 bg-emerald-600 text-white text-xs font-bold rounded-lg hover:bg-emerald-700 transition-colors"
+                >
+                  Aprovar
+                </button>
+              )}
             </div>
           </div>
         ))}
@@ -202,6 +215,7 @@ export default function Drivers() {
                   className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none"
                 >
                   <option value="active">Ativo</option>
+                  <option value="pending">Pendente</option>
                   <option value="inactive">Inativo</option>
                 </select>
               </div>

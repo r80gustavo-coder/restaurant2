@@ -36,6 +36,7 @@ export default function Menu() {
             ingredients:product_ingredients (
               quantity,
               inventory_item:inventory_items (
+                name,
                 currentStock
               )
             )
@@ -221,6 +222,11 @@ export default function Menu() {
                       <div>
                         <h3 className={`font-bold text-lg text-${themeConfig.colors.text} leading-tight mb-1 line-clamp-1`}>{product.name}</h3>
                         <p className={`text-xs text-${themeConfig.colors.textMuted} line-clamp-2 leading-relaxed`}>{product.description}</p>
+                        {product.type === 'composed' && product.ingredients && product.ingredients.length > 0 && (
+                          <p className={`text-xs text-${themeConfig.colors.textMuted} mt-1 italic line-clamp-1`}>
+                            {product.ingredients.map((i: any) => i.inventory_item?.name).filter(Boolean).join(', ')}
+                          </p>
+                        )}
                       </div>
                       <div className="flex justify-between items-end mt-2">
                         <p className={`font-black text-lg text-${themeConfig.colors.primary}`}>
@@ -295,7 +301,7 @@ export default function Menu() {
                         <UtensilsCrossed size={14} /> Ingredientes
                       </h4>
                       <p className={`text-sm text-${themeConfig.colors.text} font-medium leading-relaxed`}>
-                        {selectedProduct.ingredients.map((i: any) => i.name).join(', ')}
+                        {selectedProduct.ingredients.map((i: any) => i.inventory_item?.name).filter(Boolean).join(', ')}
                       </p>
                     </div>
                   )}

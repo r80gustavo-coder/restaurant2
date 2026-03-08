@@ -23,7 +23,7 @@ export default function OrderStatus() {
         .from('orders')
         .select(`
           *,
-          driver:drivers (
+          drivers (
             name,
             phone
           ),
@@ -55,11 +55,12 @@ export default function OrderStatus() {
       // Transformar os dados para o formato esperado pela UI
       const formattedOrders = data?.map(order => ({
         ...order,
-        items: order.items.map((item: any) => ({
+        driver: order.drivers,
+        items: order.items?.map((item: any) => ({
           ...item,
           name: item.product?.name,
           price: item.product?.price
-        }))
+        })) || []
       }));
 
       setOrders(formattedOrders || []);

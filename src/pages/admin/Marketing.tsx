@@ -40,21 +40,41 @@ export default function Marketing() {
   const generatePromotions = async () => {
     setLoading(true);
     try {
-      // Format data for AI
-      const customerData = customers.map(c => ({
-        id: c.id,
-        name: c.name,
-        phone: c.phone,
-        totalOrders: c.orders?.length || 0,
-        lastOrderDate: c.orders?.[0]?.created_at,
-        favoriteItems: c.orders?.flatMap((o: any) => o.items.map((i: any) => i.product.name)).slice(0, 3)
-      }));
+      const generatedPromotions = customers.map(c => {
+        const totalOrders = c.orders?.length || 0;
+        const lastOrderDate = c.orders?.[0]?.created_at;
+        const daysSinceLastOrder = lastOrderDate ? Math.floor((new Date().getTime() - new Date(lastOrderDate).getTime()) / (1000 * 3600 * 24)) : 0;
+        
+        let message = '';
+        let type = '';
 
-      const response = await axios.post('/api/ai/analyze-promotions', { customers: customerData });
-      setPromotions(response.data);
+        if (totalOrders === 0) {
+          type = 'Boas-vindas';
+          message = `Olá ${c.name}! Notamos que você se cadastrou mas ainda não fez seu primeiro pedido. Que tal experimentar nossas delícias hoje com 10% de desconto? Use o cupom BEMVINDO10.`;
+        } else if (daysSinceLastOrder > 30) {
+          type = 'Reativação';
+          message = `Oi ${c.name}! Estamos com saudades! Faz um tempo desde o seu último pedido. Para matar a saudade, preparamos uma oferta especial: entrega grátis no seu próximo pedido!`;
+        } else if (totalOrders > 5) {
+          type = 'Fidelidade';
+          message = `Olá ${c.name}! Você é um dos nossos melhores clientes! Como forma de agradecimento, na compra de qualquer prato principal hoje, a sobremesa é por nossa conta!`;
+        } else {
+          type = 'Promoção Padrão';
+          message = `Olá ${c.name}! Já conferiu as novidades do nosso cardápio hoje? Faça seu pedido agora e aproveite!`;
+        }
+
+        return {
+          id: c.id,
+          name: c.name,
+          phone: c.phone,
+          type,
+          message
+        };
+      });
+
+      setPromotions(generatedPromotions);
     } catch (error) {
       console.error('Error generating promotions:', error);
-      alert('Erro ao gerar promoções com IA.');
+      alert('Erro ao gerar promoções.');
     } finally {
       setLoading(false);
     }
@@ -84,7 +104,7 @@ export default function Marketing() {
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <div>
-          <h2 className={`text-2xl font-bold text-${themeConfig.colors.text}`}>Marketing & IA</h2>
+          <h2 className={`text-2xl font-bold text-${themeConfig.colors.text}`}>Marketing</h2>
           <p className={`text-${themeConfig.colors.textMuted}`}>Analise clientes e envie promoções automáticas</p>
         </div>
         <div className="flex gap-3">
@@ -100,7 +120,7 @@ export default function Marketing() {
             ) : (
               <Sparkles size={20} />
             )}
-            Analisar Clientes com IA
+            Gerar Promoções
           </button>
           
           {promotions.length > 0 && (

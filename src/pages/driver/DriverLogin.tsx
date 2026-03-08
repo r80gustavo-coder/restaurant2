@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { themeConfig } from '../../config/theme';
 import { supabase } from '../../lib/supabase';
 import { motion } from 'framer-motion';
-import { Bike, Phone, User } from 'lucide-react';
+import { Bike, Phone, User, Mail, Lock } from 'lucide-react';
 
 const MotionDiv = motion.div as any;
 
@@ -11,19 +11,31 @@ export default function DriverLogin() {
   const navigate = useNavigate();
   const [mode, setMode] = useState<'login' | 'register'>('login');
   const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [phone, setPhone] = useState('');
   const [loading, setLoading] = useState(false);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!phone) return;
+    if (!email || !password) return;
 
     setLoading(true);
     try {
+      const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+
+      if (authError) {
+        alert('Email ou senha inválidos.');
+        return;
+      }
+
       const { data: driver, error } = await supabase
         .from('drivers')
         .select('*')
-        .eq('phone', phone)
+        .eq('id', authData.user.id)
         .single();
 
       if (error || !driver) {
@@ -32,8 +44,8 @@ export default function DriverLogin() {
         return;
       }
 
-      if (driver.status === 'inactive') {
-        alert('Seu cadastro está inativo. Entre em contato com o restaurante.');
+      if (driver.status === 'inactive' || driver.status === 'pending') {
+        alert(`Seu cadastro está ${driver.status === 'pending' ? 'em análise' : 'inativo'}. Entre em contato com o restaurante.`);
         return;
       }
 
@@ -51,40 +63,37 @@ export default function DriverLogin() {
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name || !phone) return;
+    if (!name || !email || !password || !phone) return;
 
     setLoading(true);
     try {
-      let { data: driver, error: fetchError } = await supabase
-        .from('drivers')
-        .select('*')
-        .eq('phone', phone)
-        .single();
+      const { data: authData, error: authError } = await supabase.auth.signUp({
+        email,
+        password,
+      });
 
-      if (fetchError && fetchError.code !== 'PGRST116') {
-        throw fetchError;
+      if (authError) {
+        if (authError.message.includes('already registered')) {
+          alert('Este email já está cadastrado. Por favor, faça login.');
+          setMode('login');
+        } else {
+          alert('Erro ao criar usuário: ' + authError.message);
+        }
+        return;
       }
 
-      if (!driver) {
+      if (authData.user) {
         const { data: newDriver, error: insertError } = await supabase
           .from('drivers')
-          .insert([{ name, phone, status: 'active' }])
+          .insert([{ id: authData.user.id, name, phone, status: 'pending' }])
           .select()
           .single();
         
         if (insertError) throw insertError;
-        driver = newDriver;
-      } else {
-        await supabase
-          .from('drivers')
-          .update({ name, status: 'active' })
-          .eq('id', driver.id);
-      }
 
-      localStorage.setItem('driverId', driver.id);
-      localStorage.setItem('driverName', name);
-      
-      navigate('/driver/dashboard');
+        alert('Cadastro realizado com sucesso! Seu perfil está em análise. Aguarde a aprovação do restaurante.');
+        setMode('login');
+      }
     } catch (error) {
       console.error('Register error:', error);
       alert('Erro ao realizar cadastro. Tente novamente.');
@@ -142,19 +151,51 @@ export default function DriverLogin() {
           )}
 
           <div>
-            <label className={`block text-sm font-medium text-${themeConfig.colors.text} mb-1.5`}>WhatsApp</label>
+            <label className={`block text-sm font-medium text-${themeConfig.colors.text} mb-1.5`}>Email</label>
             <div className="relative">
-              <Phone className={`absolute left-4 top-1/2 -translate-y-1/2 text-${themeConfig.colors.textMuted}`} size={20} />
+              <Mail className={`absolute left-4 top-1/2 -translate-y-1/2 text-${themeConfig.colors.textMuted}`} size={20} />
               <input
-                type="tel"
+                type="email"
                 required
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
                 className={`w-full pl-12 pr-4 py-3.5 rounded-2xl bg-slate-50 border border-slate-200 focus:bg-white focus:border-${themeConfig.colors.primary} focus:ring-2 focus:ring-${themeConfig.colors.primary}/20 outline-none transition-all`}
-                placeholder="(00) 00000-0000"
+                placeholder="seu@email.com"
               />
             </div>
           </div>
+
+          <div>
+            <label className={`block text-sm font-medium text-${themeConfig.colors.text} mb-1.5`}>Senha</label>
+            <div className="relative">
+              <Lock className={`absolute left-4 top-1/2 -translate-y-1/2 text-${themeConfig.colors.textMuted}`} size={20} />
+              <input
+                type="password"
+                required
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className={`w-full pl-12 pr-4 py-3.5 rounded-2xl bg-slate-50 border border-slate-200 focus:bg-white focus:border-${themeConfig.colors.primary} focus:ring-2 focus:ring-${themeConfig.colors.primary}/20 outline-none transition-all`}
+                placeholder="Sua senha"
+              />
+            </div>
+          </div>
+
+          {mode === 'register' && (
+            <div>
+              <label className={`block text-sm font-medium text-${themeConfig.colors.text} mb-1.5`}>WhatsApp</label>
+              <div className="relative">
+                <Phone className={`absolute left-4 top-1/2 -translate-y-1/2 text-${themeConfig.colors.textMuted}`} size={20} />
+                <input
+                  type="tel"
+                  required
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  className={`w-full pl-12 pr-4 py-3.5 rounded-2xl bg-slate-50 border border-slate-200 focus:bg-white focus:border-${themeConfig.colors.primary} focus:ring-2 focus:ring-${themeConfig.colors.primary}/20 outline-none transition-all`}
+                  placeholder="(00) 00000-0000"
+                />
+              </div>
+            </div>
+          )}
 
           <button
             type="submit"

@@ -37,7 +37,7 @@ export default function DriverDashboard() {
         .from('orders')
         .select(`
           *,
-          customer:customers (
+          customers (
             name,
             phone
           ),
@@ -52,11 +52,16 @@ export default function DriverDashboard() {
 
       if (error) throw error;
 
-      // Filter orders: either unassigned (ready) or assigned to this driver (out_for_delivery)
-      const filteredOrders = data?.filter(order => 
-        (order.status === 'ready' && !order.driver_id) || 
-        (order.status === 'out_for_delivery' && order.driver_id === driverId)
-      ) || [];
+        const formattedOrders = data?.map(order => ({
+          ...order,
+          customer: order.customers
+        }));
+
+        // Filter orders: either unassigned (ready) or assigned to this driver (out_for_delivery)
+        const filteredOrders = formattedOrders?.filter(order => 
+          (order.status === 'ready' && !order.driver_id) || 
+          (order.status === 'out_for_delivery' && order.driver_id === driverId)
+        ) || [];
 
       setOrders(filteredOrders);
     } catch (error) {

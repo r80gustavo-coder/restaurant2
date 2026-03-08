@@ -9,7 +9,9 @@ export default function Cart() {
   const navigate = useNavigate();
   const [cart, setCart] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
-  const [paymentMethod, setPaymentMethod] = useState('stripe'); // stripe, cash, pix
+  const [paymentMethod, setPaymentMethod] = useState('credit_card'); // credit_card, cash, pix
+  const [showCardForm, setShowCardForm] = useState(false);
+  const [cardData, setCardData] = useState({ number: '', name: '', expiry: '', cvv: '' });
   const orderType = sessionStorage.getItem('orderType');
 
   useEffect(() => {
@@ -33,6 +35,17 @@ export default function Cart() {
 
   const placeOrder = async () => {
     if (cart.length === 0) return;
+    
+    if (orderType === 'online' && paymentMethod === 'credit_card' && !showCardForm) {
+      setShowCardForm(true);
+      return;
+    }
+
+    if (showCardForm && (!cardData.number || !cardData.name || !cardData.expiry || !cardData.cvv)) {
+      alert('Por favor, preencha todos os dados do cartão.');
+      return;
+    }
+
     setLoading(true);
 
     const tableId = sessionStorage.getItem('tableId');
@@ -87,28 +100,16 @@ export default function Cart() {
           .eq('id', parseInt(tableId));
       }
 
-      // 4. Handle Stripe Payment
-      if (orderType === 'online' && paymentMethod === 'stripe') {
-        try {
-          const response = await axios.post('/api/stripe/create-checkout-session', {
-            items: cart,
-            orderId: order.id,
-            successUrl: `${window.location.origin}/status`,
-            cancelUrl: `${window.location.origin}/cart`
-          });
-          
-          await supabase.from('orders').update({ stripe_session_id: response.data.id }).eq('id', order.id);
-          
-          sessionStorage.removeItem('cart');
-          window.location.href = response.data.url;
-          return;
-        } catch (error) {
-          console.error('Stripe error:', error);
-          // Fallback to status page if stripe fails in preview
-          sessionStorage.removeItem('cart');
-          navigate('/status');
-          return;
-        }
+      // 4. Handle Credit Card Payment
+      if (orderType === 'online' && paymentMethod === 'credit_card') {
+        // Simulate payment processing
+        await new Promise(resolve => setTimeout(resolve, 1500));
+        await supabase.from('orders').update({ paymentStatus: 'paid' }).eq('id', order.id);
+        
+        sessionStorage.removeItem('cart');
+        setCart([]);
+        navigate('/status');
+        return;
       }
 
       if (orderType === 'online' && paymentMethod === 'pix') {
@@ -190,9 +191,9 @@ export default function Cart() {
             <h4 className={`text-sm font-bold text-${themeConfig.colors.text} mb-2 px-2`}>Forma de Pagamento</h4>
             <div className="grid grid-cols-2 gap-2">
               <button
-                onClick={() => setPaymentMethod('stripe')}
+                onClick={() => { setPaymentMethod('credit_card'); setShowCardForm(false); }}
                 className={`flex flex-col items-center justify-center p-3 rounded-xl border-2 transition-all ${
-                  paymentMethod === 'stripe' 
+                  paymentMethod === 'credit_card' 
                     ? `border-${themeConfig.colors.primary} bg-${themeConfig.colors.primary}/5 text-${themeConfig.colors.primary}` 
                     : 'border-slate-100 bg-slate-50 text-slate-500 hover:bg-slate-100'
                 }`}
@@ -201,7 +202,7 @@ export default function Cart() {
                 <span className="text-xs font-bold">Cartão</span>
               </button>
               <button
-                onClick={() => setPaymentMethod('pix')}
+                onClick={() => { setPaymentMethod('pix'); setShowCardForm(false); }}
                 className={`flex flex-col items-center justify-center p-3 rounded-xl border-2 transition-all ${
                   paymentMethod === 'pix' 
                     ? `border-${themeConfig.colors.primary} bg-${themeConfig.colors.primary}/5 text-${themeConfig.colors.primary}` 
@@ -222,12 +223,48 @@ export default function Cart() {
           </span>
         </div>
         
+        {showCardForm && paymentMethod === 'credit_card' && (
+          <div className="mb-4 space-y-3 bg-slate-50 p-4 rounded-2xl border border-slate-200">
+            <h4 className="font-bold text-slate-700 mb-2">Dados do Cartão</h4>
+            <input 
+              type="text" 
+              placeholder="Número do Cartão" 
+              value={cardData.number}
+              onChange={e => setCardData({...cardData, number: e.target.value})}
+              className="w-full p-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none"
+            />
+            <input 
+              type="text" 
+              placeholder="Nome impresso no cartão" 
+              value={cardData.name}
+              onChange={e => setCardData({...cardData, name: e.target.value})}
+              className="w-full p-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none"
+            />
+            <div className="flex gap-3">
+              <input 
+                type="text" 
+                placeholder="Validade (MM/AA)" 
+                value={cardData.expiry}
+                onChange={e => setCardData({...cardData, expiry: e.target.value})}
+                className="w-1/2 p-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none"
+              />
+              <input 
+                type="text" 
+                placeholder="CVV" 
+                value={cardData.cvv}
+                onChange={e => setCardData({...cardData, cvv: e.target.value})}
+                className="w-1/2 p-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none"
+              />
+            </div>
+          </div>
+        )}
+
         <button 
           onClick={placeOrder}
           disabled={loading}
           className={`w-full py-4 bg-${themeConfig.colors.primary} text-white font-black text-lg rounded-2xl flex items-center justify-center gap-3 shadow-lg shadow-${themeConfig.colors.primary}/30 disabled:opacity-50 disabled:cursor-not-allowed active:scale-[0.98] transition-all group`}
         >
-          {loading ? 'Enviando...' : 'Confirmar Pedido'}
+          {loading ? 'Processando...' : (showCardForm ? 'Pagar e Confirmar' : 'Confirmar Pedido')}
           {!loading && <ArrowRight size={22} className="group-hover:translate-x-1 transition-transform" />}
         </button>
       </div>
