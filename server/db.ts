@@ -1,124 +1,152 @@
-import sqlite3 from 'sqlite3';
-import { open } from 'sqlite';
-import path from 'path';
-import { fileURLToPath } from 'url';
+import mysql from 'mysql2/promise';
+import dotenv from 'dotenv';
+import bcrypt from 'bcryptjs';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+dotenv.config();
+
+// Create a connection pool
+const pool = mysql.createPool({
+  host: process.env.DB_HOST || 'localhost',
+  user: process.env.DB_USER || 'root',
+  password: process.env.DB_PASSWORD || '',
+  database: process.env.DB_NAME || 'restaurant_db',
+  port: Number(process.env.DB_PORT) || 3306,
+  waitForConnections: true,
+  connectionLimit: 10,
+  queueLimit: 0
+});
 
 export async function getDb() {
-  return open({
-    filename: path.join(__dirname, 'database.sqlite'),
-    driver: sqlite3.Database
-  });
+  return pool;
 }
 
 export async function initDb() {
   const db = await getDb();
   
-  await db.exec(`
+  await db.query(`
     CREATE TABLE IF NOT EXISTS users (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      email TEXT UNIQUE,
-      password TEXT,
-      role TEXT DEFAULT 'admin'
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      email VARCHAR(255) UNIQUE,
+      password VARCHAR(255),
+      role VARCHAR(50) DEFAULT 'admin'
     );
+  `);
 
+  await db.query(`
     CREATE TABLE IF NOT EXISTS customers (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      name TEXT,
-      email TEXT UNIQUE,
-      phone TEXT,
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      name VARCHAR(255),
+      email VARCHAR(255) UNIQUE,
+      phone VARCHAR(50),
       address TEXT
     );
+  `);
 
+  await db.query(`
     CREATE TABLE IF NOT EXISTS categories (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      name TEXT,
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      name VARCHAR(255),
       description TEXT,
       image TEXT,
       active BOOLEAN DEFAULT 1
     );
+  `);
 
+  await db.query(`
     CREATE TABLE IF NOT EXISTS products (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      name TEXT,
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      name VARCHAR(255),
       description TEXT,
-      price REAL,
+      price DECIMAL(10,2),
       image TEXT,
-      categoryId INTEGER,
-      type TEXT DEFAULT 'fixed',
+      categoryId INT,
+      type VARCHAR(50) DEFAULT 'fixed',
       active BOOLEAN DEFAULT 1,
       FOREIGN KEY (categoryId) REFERENCES categories(id)
     );
+  `);
 
+  await db.query(`
     CREATE TABLE IF NOT EXISTS tables (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      number INTEGER UNIQUE,
-      status TEXT DEFAULT 'livre',
-      loginCode TEXT,
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      number INT UNIQUE,
+      status VARCHAR(50) DEFAULT 'livre',
+      loginCode VARCHAR(50),
       active BOOLEAN DEFAULT 1
     );
+  `);
 
+  await db.query(`
     CREATE TABLE IF NOT EXISTS orders (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      tableId INTEGER,
-      customer_id INTEGER,
-      status TEXT DEFAULT 'pending',
-      paymentStatus TEXT DEFAULT 'pending',
-      payment_method TEXT,
-      total REAL,
-      type TEXT,
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      tableId INT,
+      customer_id INT,
+      status VARCHAR(50) DEFAULT 'pending',
+      paymentStatus VARCHAR(50) DEFAULT 'pending',
+      payment_method VARCHAR(50),
+      total DECIMAL(10,2),
+      type VARCHAR(50),
       delivery_address TEXT,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (tableId) REFERENCES tables(id),
       FOREIGN KEY (customer_id) REFERENCES customers(id)
     );
+  `);
 
+  await db.query(`
     CREATE TABLE IF NOT EXISTS order_items (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      orderId INTEGER,
-      productId INTEGER,
-      quantity INTEGER,
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      orderId INT,
+      productId INT,
+      quantity INT,
       notes TEXT,
       FOREIGN KEY (orderId) REFERENCES orders(id),
       FOREIGN KEY (productId) REFERENCES products(id)
     );
+  `);
 
+  await db.query(`
     CREATE TABLE IF NOT EXISTS inventory_items (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      name TEXT,
-      unit TEXT,
-      currentStock REAL,
-      minStock REAL,
-      cost REAL
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      name VARCHAR(255),
+      unit VARCHAR(50),
+      currentStock DECIMAL(10,2),
+      minStock DECIMAL(10,2),
+      cost DECIMAL(10,2)
     );
+  `);
 
+  await db.query(`
     CREATE TABLE IF NOT EXISTS product_ingredients (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      productId INTEGER,
-      inventoryItemId INTEGER,
-      quantity REAL,
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      productId INT,
+      inventoryItemId INT,
+      quantity DECIMAL(10,2),
       FOREIGN KEY (productId) REFERENCES products(id),
       FOREIGN KEY (inventoryItemId) REFERENCES inventory_items(id)
     );
-    
+  `);
+  
+  await db.query(`
     CREATE TABLE IF NOT EXISTS chat_messages (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      sender_id TEXT,
-      sender_type TEXT,
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      sender_id VARCHAR(255),
+      sender_type VARCHAR(50),
       content TEXT,
-      read BOOLEAN DEFAULT 0,
+      read_status BOOLEAN DEFAULT 0,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
   `);
 
   // Insert default admin if not exists
-  const admin = await db.get('SELECT * FROM users WHERE email = ?', ['admin@admin.com']);
-  if (!admin) {
-    const bcrypt = await import('bcryptjs');
-    const hash = await bcrypt.hash('admin123', 10);
-    await db.run('INSERT INTO users (email, password, role) VALUES (?, ?, ?)', ['admin@admin.com', hash, 'admin']);
+  try {
+    const [rows]: any = await db.query('SELECT * FROM users WHERE email = ?', ['admin@admin.com']);
+    if (rows.length === 0) {
+      const hash = await bcrypt.hash('admin123', 10);
+      await db.query('INSERT INTO users (email, password, role) VALUES (?, ?, ?)', ['admin@admin.com', hash, 'admin']);
+    }
+  } catch (err) {
+    console.error('Error creating default admin:', err);
   }
 
   return db;

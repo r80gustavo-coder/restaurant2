@@ -30,7 +30,12 @@ async function startServer() {
   app.use(express.json());
 
   // Initialize Database
-  await initDb();
+  try {
+    await initDb();
+    console.log('Database initialized successfully.');
+  } catch (err) {
+    console.error('Failed to initialize database. Please check your MySQL credentials.', err);
+  }
 
   // Socket.io for Real-time
   io.on('connection', (socket) => {
@@ -54,7 +59,7 @@ async function startServer() {
   });
 
   // Middleware to attach io to req
-  app.use((req, res, next) => {
+  app.use((req: any, res, next) => {
     req.io = io;
     next();
   });
@@ -66,25 +71,27 @@ async function startServer() {
     const { email, password } = req.body;
     const db = await getDb();
     
-    // Check admin users
-    const user = await db.get('SELECT * FROM users WHERE email = ?', [email]);
-    if (user && await bcrypt.compare(password, user.password)) {
-      const token = jwt.sign({ id: user.id, role: user.role }, JWT_SECRET, { expiresIn: '1d' });
-      return res.json({ token, user: { id: user.id, email: user.email, role: user.role } });
-    }
+    try {
+      // Check admin users
+      const [users]: any = await db.query('SELECT * FROM users WHERE email = ?', [email]);
+      const user = users[0];
+      if (user && await bcrypt.compare(password, user.password)) {
+        const token = jwt.sign({ id: user.id, role: user.role }, JWT_SECRET, { expiresIn: '1d' });
+        return res.json({ token, user: { id: user.id, email: user.email, role: user.role } });
+      }
 
-    // Check customers
-    const customer = await db.get('SELECT * FROM customers WHERE email = ?', [email]);
-    if (customer) {
-      // In a real app, customers should also have passwords. For simplicity, we assume they do or we use a different flow.
-      // Let's assume customer login needs password if we added it, but for now we just check if exists.
-      // Actually, OnlineLogin uses Supabase auth. We need to handle customer passwords.
-      // Let's just return customer if found for now (insecure, but matches the migration step).
-      const token = jwt.sign({ id: customer.id, role: 'customer' }, JWT_SECRET, { expiresIn: '1d' });
-      return res.json({ token, user: customer });
-    }
+      // Check customers
+      const [customers]: any = await db.query('SELECT * FROM customers WHERE email = ?', [email]);
+      const customer = customers[0];
+      if (customer) {
+        const token = jwt.sign({ id: customer.id, role: 'customer' }, JWT_SECRET, { expiresIn: '1d' });
+        return res.json({ token, user: customer });
+      }
 
-    res.status(401).json({ error: 'Invalid credentials' });
+      res.status(401).json({ error: 'Invalid credentials' });
+    } catch (err) {
+      res.status(500).json({ error: 'Database error' });
+    }
   });
 
   app.post('/api/auth/register', async (req, res) => {
@@ -92,102 +99,120 @@ async function startServer() {
     const db = await getDb();
     
     try {
-      // We should store password for customer, let's add it to schema if needed or just store in users.
-      // For now, let's insert into customers.
-      const result = await db.run(
+      const [result]: any = await db.execute(
         'INSERT INTO customers (name, email, phone, address) VALUES (?, ?, ?, ?)',
         [name, email, phone, address]
       );
       
-      const customer = await db.get('SELECT * FROM customers WHERE id = ?', [result.lastID]);
+      const [customers]: any = await db.query('SELECT * FROM customers WHERE id = ?', [result.insertId]);
+      const customer = customers[0];
       const token = jwt.sign({ id: customer.id, role: 'customer' }, JWT_SECRET, { expiresIn: '1d' });
       res.json({ token, user: customer });
     } catch (e) {
-      res.status(400).json({ error: 'Email already exists' });
+      res.status(400).json({ error: 'Email already exists or invalid data' });
     }
   });
 
   // Tables
   app.get('/api/tables', async (req, res) => {
-    const db = await getDb();
-    const tables = await db.all('SELECT * FROM tables ORDER BY number');
-    res.json(tables);
+    try {
+      const db = await getDb();
+      const [tables] = await db.query('SELECT * FROM tables ORDER BY number');
+      res.json(tables);
+    } catch (err) {
+      res.status(500).json({ error: 'Database error' });
+    }
   });
 
   app.post('/api/tables/login', async (req, res) => {
     const { tableId, code } = req.body;
-    const db = await getDb();
-    const table = await db.get('SELECT * FROM tables WHERE id = ?', [tableId]);
-    
-    if (!table || !table.active) return res.status(404).json({ error: 'Table not found or inactive' });
-    if (table.loginCode !== code.toUpperCase()) return res.status(401).json({ error: 'Invalid code' });
-    
-    res.json(table);
+    try {
+      const db = await getDb();
+      const [tables]: any = await db.query('SELECT * FROM tables WHERE id = ?', [tableId]);
+      const table = tables[0];
+      
+      if (!table || !table.active) return res.status(404).json({ error: 'Table not found or inactive' });
+      if (table.loginCode !== code.toUpperCase()) return res.status(401).json({ error: 'Invalid code' });
+      
+      res.json(table);
+    } catch (err) {
+      res.status(500).json({ error: 'Database error' });
+    }
   });
 
   // Products & Categories
   app.get('/api/categories', async (req, res) => {
-    const db = await getDb();
-    const categories = await db.all('SELECT * FROM categories ORDER BY name');
-    res.json(categories);
+    try {
+      const db = await getDb();
+      const [categories] = await db.query('SELECT * FROM categories ORDER BY name');
+      res.json(categories);
+    } catch (err) {
+      res.status(500).json({ error: 'Database error' });
+    }
   });
 
   app.get('/api/products', async (req, res) => {
-    const db = await getDb();
-    const products = await db.all(`
-      SELECT p.*, c.name as categoryName 
-      FROM products p 
-      LEFT JOIN categories c ON p.categoryId = c.id 
-      ORDER BY p.name
-    `);
-    
-    // Fetch ingredients for composed products
-    for (let p of products) {
-      if (p.type === 'composed') {
-        p.ingredients = await db.all(`
-          SELECT pi.*, i.name as inventoryName, i.currentStock 
-          FROM product_ingredients pi
-          JOIN inventory_items i ON pi.inventoryItemId = i.id
-          WHERE pi.productId = ?
-        `, [p.id]);
-      } else {
-        // Fetch inventory item for fixed products
-        p.inventory_item = await db.get('SELECT * FROM inventory_items WHERE id = ?', [p.id]); // Simplified relation
+    try {
+      const db = await getDb();
+      const [products]: any = await db.query(`
+        SELECT p.*, c.name as categoryName 
+        FROM products p 
+        LEFT JOIN categories c ON p.categoryId = c.id 
+        ORDER BY p.name
+      `);
+      
+      // Fetch ingredients for composed products
+      for (let p of products) {
+        if (p.type === 'composed') {
+          const [ingredients] = await db.query(`
+            SELECT pi.*, i.name as inventoryName, i.currentStock 
+            FROM product_ingredients pi
+            JOIN inventory_items i ON pi.inventoryItemId = i.id
+            WHERE pi.productId = ?
+          `, [p.id]);
+          p.ingredients = ingredients;
+        } else {
+          const [inventory_items]: any = await db.query('SELECT * FROM inventory_items WHERE id = ?', [p.id]);
+          p.inventory_item = inventory_items[0] || null;
+        }
       }
+      
+      res.json(products);
+    } catch (err) {
+      res.status(500).json({ error: 'Database error' });
     }
-    
-    res.json(products);
   });
 
   // Orders
-  app.post('/api/orders', async (req, res) => {
+  app.post('/api/orders', async (req: any, res) => {
     const { tableId, customer_id, items, total, type, delivery_address, payment_method } = req.body;
     const db = await getDb();
     
     try {
-      await db.run('BEGIN TRANSACTION');
+      await db.query('START TRANSACTION');
       
-      const orderResult = await db.run(
+      const [orderResult]: any = await db.execute(
         'INSERT INTO orders (tableId, customer_id, total, type, delivery_address, payment_method) VALUES (?, ?, ?, ?, ?, ?)',
-        [tableId, customer_id, total, type, delivery_address, payment_method]
+        [tableId || null, customer_id || null, total, type, delivery_address, payment_method]
       );
       
-      const orderId = orderResult.lastID;
+      const orderId = orderResult.insertId;
       
       for (const item of items) {
-        await db.run(
+        await db.execute(
           'INSERT INTO order_items (orderId, productId, quantity, notes) VALUES (?, ?, ?, ?)',
-          [orderId, item.id, item.quantity, item.notes]
+          [orderId, item.id, item.quantity, item.notes || '']
         );
       }
       
       if (type === 'table' && tableId) {
-        await db.run('UPDATE tables SET status = ? WHERE id = ?', ['ocupada', tableId]);
+        await db.execute('UPDATE tables SET status = ? WHERE id = ?', ['ocupada', tableId]);
       }
       
-      await db.run('COMMIT');
+      await db.query('COMMIT');
       
-      const newOrder = await db.get('SELECT * FROM orders WHERE id = ?', [orderId]);
+      const [newOrders]: any = await db.query('SELECT * FROM orders WHERE id = ?', [orderId]);
+      const newOrder = newOrders[0];
       
       // Notify via Socket.io
       req.io.to('admin').emit('new-order', newOrder);
@@ -195,30 +220,39 @@ async function startServer() {
       
       res.json(newOrder);
     } catch (e) {
-      await db.run('ROLLBACK');
+      await db.query('ROLLBACK');
       res.status(500).json({ error: 'Failed to create order' });
     }
   });
 
   app.get('/api/orders', async (req, res) => {
-    const db = await getDb();
-    const orders = await db.all('SELECT * FROM orders ORDER BY created_at DESC');
-    res.json(orders);
+    try {
+      const db = await getDb();
+      const [orders] = await db.query('SELECT * FROM orders ORDER BY created_at DESC');
+      res.json(orders);
+    } catch (err) {
+      res.status(500).json({ error: 'Database error' });
+    }
   });
 
-  app.patch('/api/orders/:id/status', async (req, res) => {
+  app.patch('/api/orders/:id/status', async (req: any, res) => {
     const { status } = req.body;
     const { id } = req.params;
-    const db = await getDb();
     
-    await db.run('UPDATE orders SET status = ? WHERE id = ?', [status, id]);
-    const order = await db.get('SELECT * FROM orders WHERE id = ?', [id]);
-    
-    req.io.to('admin').emit('order-updated', order);
-    if (order.tableId) req.io.to(`table-${order.tableId}`).emit('order-updated', order);
-    if (order.customer_id) req.io.to(`customer-${order.customer_id}`).emit('order-updated', order);
-    
-    res.json(order);
+    try {
+      const db = await getDb();
+      await db.execute('UPDATE orders SET status = ? WHERE id = ?', [status, id]);
+      const [orders]: any = await db.query('SELECT * FROM orders WHERE id = ?', [id]);
+      const order = orders[0];
+      
+      req.io.to('admin').emit('order-updated', order);
+      if (order.tableId) req.io.to(`table-${order.tableId}`).emit('order-updated', order);
+      if (order.customer_id) req.io.to(`customer-${order.customer_id}`).emit('order-updated', order);
+      
+      res.json(order);
+    } catch (err) {
+      res.status(500).json({ error: 'Database error' });
+    }
   });
 
   // Serve Vite in development or static files in production
@@ -236,7 +270,7 @@ async function startServer() {
   }
 
   server.listen(PORT, '0.0.0.0', () => {
-    console.log(`Servidor rodando na porta ${PORT}`);
+    console.log(\`Servidor rodando na porta \${PORT}\`);
   });
 }
 
