@@ -15,13 +15,11 @@ import Customers from './pages/admin/Customers';
 import Inventory from './pages/admin/Inventory';
 import Checkout from './pages/admin/Checkout';
 import Reports from './pages/admin/Reports';
-import Chat from './pages/admin/Chat';
 import Login from './pages/admin/Login';
 import Tables from './pages/admin/Tables';
 import Staff from './pages/admin/Staff';
 import Kitchen from './pages/admin/Kitchen';
 import Waiter from './pages/admin/Waiter';
-import Marketing from './pages/admin/Marketing';
 import Drivers from './pages/admin/Drivers';
 
 // Customer Pages
@@ -88,6 +86,8 @@ export default function App() {
           ALTER TABLE orders ADD COLUMN IF NOT EXISTS payment_method TEXT;
           ALTER TABLE orders ADD COLUMN IF NOT EXISTS payment_status TEXT DEFAULT 'pending';
           ALTER TABLE orders ADD COLUMN IF NOT EXISTS stripe_session_id TEXT;
+          
+          NOTIFY pgrst, 'reload schema';
         `
       });
     };
@@ -112,10 +112,8 @@ export default function App() {
           <Route path="tables" element={<Tables />} />
           <Route path="checkout" element={<Checkout />} />
           <Route path="reports" element={<Reports />} />
-          <Route path="chat" element={<Chat />} />
           <Route path="staff" element={<Staff />} />
           <Route path="drivers" element={<Drivers />} />
-          <Route path="marketing" element={<Marketing />} />
         </Route>
 
         {/* Driver Routes */}

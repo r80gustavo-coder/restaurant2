@@ -37,10 +37,20 @@ ALTER TABLE public.drivers ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.customers ENABLE ROW LEVEL SECURITY;
 
 -- Create policies (simplified for this example)
+DROP POLICY IF EXISTS "Allow public read access on drivers" ON public.drivers;
 CREATE POLICY "Allow public read access on drivers" ON public.drivers FOR SELECT USING (true);
+
+DROP POLICY IF EXISTS "Allow public insert on drivers" ON public.drivers;
 CREATE POLICY "Allow public insert on drivers" ON public.drivers FOR INSERT WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Allow public update on drivers" ON public.drivers;
 CREATE POLICY "Allow public update on drivers" ON public.drivers FOR UPDATE USING (true);
 
+DROP POLICY IF EXISTS "Allow public read access on customers" ON public.customers;
 CREATE POLICY "Allow public read access on customers" ON public.customers FOR SELECT USING (true);
+
+DROP POLICY IF EXISTS "Allow public insert on customers" ON public.customers;
 CREATE POLICY "Allow public insert on customers" ON public.customers FOR INSERT WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Allow public update on customers" ON public.customers;
 CREATE POLICY "Allow public update on customers" ON public.customers FOR UPDATE USING (true);

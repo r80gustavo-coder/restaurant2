@@ -12,7 +12,7 @@ export default function Cart() {
   const [paymentMethod, setPaymentMethod] = useState('credit_card'); // credit_card, cash, pix
   const [showCardForm, setShowCardForm] = useState(false);
   const [cardData, setCardData] = useState({ number: '', name: '', expiry: '', cvv: '' });
-  const orderType = sessionStorage.getItem('orderType');
+  const orderType = sessionStorage.getItem('orderType') || 'table';
 
   useEffect(() => {
     const tableId = sessionStorage.getItem('tableId');
@@ -57,7 +57,7 @@ export default function Cart() {
         status: 'pending',
         paymentStatus: 'pending',
         total: total,
-        type: orderType || 'table'
+        type: orderType
       };
 
       if (orderType === 'table' && tableId) {
