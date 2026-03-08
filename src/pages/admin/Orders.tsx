@@ -17,12 +17,12 @@ export default function Orders() {
           table:tables (
             number
           ),
-          customer:customers (
+          customers (
             name,
             phone,
             address
           ),
-          driver:drivers (
+          drivers (
             name,
             phone
           ),
@@ -40,17 +40,20 @@ export default function Orders() {
         .neq('status', 'chat_read')
         .order('createdAt', { ascending: false });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Supabase error fetching orders:', error);
+        throw error;
+      }
 
       // Transformar os dados para o formato esperado pela UI
       const formattedOrders = data?.map(order => ({
         ...order,
         tableNumber: order.table?.number,
-        customerName: order.customer?.name,
-        customerPhone: order.customer?.phone,
-        driverName: order.driver?.name,
-        driverPhone: order.driver?.phone,
-        deliveryAddress: order.delivery_address?.full || order.customer?.address?.full,
+        customerName: order.customers?.name,
+        customerPhone: order.customers?.phone,
+        driverName: order.drivers?.name,
+        driverPhone: order.drivers?.phone,
+        deliveryAddress: order.delivery_address?.full || order.customers?.address?.full,
         items: order.items?.map((item: any) => ({
           ...item,
           name: item.product?.name,

@@ -25,8 +25,7 @@ ALTER TABLE public.customers ADD COLUMN IF NOT EXISTS last_order_date TIMESTAMP 
 
 -- Update orders table
 ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS type TEXT DEFAULT 'table'; -- table, delivery, takeout
-ALTER TABLE public.orders DROP COLUMN IF EXISTS customer_id CASCADE;
-ALTER TABLE public.orders ADD COLUMN customer_id BIGINT REFERENCES public.customers(id);
+ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS customer_id BIGINT REFERENCES public.customers(id);
 ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS delivery_address JSONB;
 ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS driver_id UUID REFERENCES public.drivers(id);
 ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS payment_method TEXT; -- stripe, cash, pix
