@@ -4,6 +4,7 @@ import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { createServer as createViteServer } from 'vite';
+import fs from 'fs';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
 import { initDb, getDb } from './server/db.js';
@@ -263,14 +264,29 @@ async function startServer() {
     });
     app.use(vite.middlewares);
   } else {
-    app.use(express.static(path.join(__dirname, 'dist')));
-    app.get('*', (req, res) => {
-      res.sendFile(path.join(__dirname, 'dist', 'index.html'));
-    });
+    const distPath = path.join(__dirname, 'dist');
+    
+    if (fs.existsSync(distPath)) {
+      console.log('Servindo arquivos estáticos de: ' + distPath);
+      app.use(express.static(distPath));
+      
+      app.get('*', (req, res) => {
+        if (req.path.startsWith('/api')) {
+          return res.status(404).json({ error: 'API route not found' });
+        }
+        res.sendFile(path.join(distPath, 'index.html'));
+      });
+    } else {
+      console.error('ERRO CRÍTICO: Pasta "dist" não encontrada!');
+      console.error('Você rodou "npm run build" antes de iniciar o servidor?');
+      app.get('*', (req, res) => {
+        res.status(500).send('<h1>Erro no Servidor</h1><p>A pasta "dist" não foi encontrada. Por favor, execute <code>npm run build</code> no servidor.</p>');
+      });
+    }
   }
 
   server.listen(PORT, '0.0.0.0', () => {
-    console.log(\`Servidor rodando na porta \${PORT}\`);
+    console.log('Servidor rodando na porta ' + PORT);
   });
 }
 
