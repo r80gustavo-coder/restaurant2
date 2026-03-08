@@ -114,17 +114,110 @@ async function startServer() {
     }
   });
 
-  // Tables
-  app.get('/api/tables', async (req, res) => {
-    try {
-      const db = await getDb();
-      const [tables] = await db.query('SELECT * FROM tables ORDER BY number');
-      res.json(tables);
-    } catch (err) {
-      res.status(500).json({ error: 'Database error' });
-    }
+  // Generic CRUD for tables
+  const tables_list = ['users', 'customers', 'categories', 'products', 'tables', 'orders', 'order_items', 'inventory_items', 'product_ingredients', 'chat_messages', 'drivers', 'staff'];
+  
+  tables_list.forEach(tableName => {
+    // GET all or filtered
+    app.get(`/api/${tableName}`, async (req, res) => {
+      try {
+        const db = await getDb();
+        let query = `SELECT * FROM ${tableName}`;
+        const params: any[] = [];
+        
+        const filters = Object.keys(req.query).filter(k => k !== 'orderBy' && k !== 'ascending' && k !== 'limit' && k !== 'select');
+        if (filters.length > 0) {
+          query += ' WHERE ' + filters.map(f => `${f} = ?`).join(' AND ');
+          filters.forEach(f => params.push(req.query[f]));
+        }
+        
+        if (req.query.orderBy) {
+          query += ` ORDER BY ${req.query.orderBy} ${req.query.ascending === 'false' ? 'DESC' : 'ASC'}`;
+        }
+        
+        if (req.query.limit) {
+          query += ` LIMIT ${Number(req.query.limit)}`;
+        }
+        
+        const [rows] = await db.query(query, params);
+        res.json(rows);
+      } catch (err) {
+        console.error(`Error fetching ${tableName}:`, err);
+        res.status(500).json({ error: 'Database error' });
+      }
+    });
+
+    // POST new
+    app.post(`/api/${tableName}`, async (req: any, res) => {
+      try {
+        const db = await getDb();
+        const keys = Object.keys(req.body);
+        const values = Object.values(req.body);
+        
+        const query = `INSERT INTO ${tableName} (${keys.join(', ')}) VALUES (${keys.map(() => '?').join(', ')})`;
+        const [result]: any = await db.execute(query, values as any[]);
+        
+        const [rows]: any = await db.query(`SELECT * FROM ${tableName} WHERE id = ?`, [result.insertId]);
+        const newRow = rows[0];
+        
+        // Broadcast changes
+        req.io.to('admin').emit(`${tableName.replace(/s$/, '')}-created`, newRow);
+        
+        res.json(newRow);
+      } catch (err) {
+        console.error(`Error creating ${tableName}:`, err);
+        res.status(500).json({ error: 'Database error' });
+      }
+    });
+
+    // PATCH update
+    app.patch(`/api/${tableName}/:id`, async (req: any, res) => {
+      try {
+        const db = await getDb();
+        const { id } = req.params;
+        const keys = Object.keys(req.body);
+        const values = Object.values(req.body);
+        
+        const query = `UPDATE ${tableName} SET ${keys.map(k => `${k} = ?`).join(', ')} WHERE id = ?`;
+        await db.execute(query, [...values as any[], id]);
+        
+        const [rows]: any = await db.query(`SELECT * FROM ${tableName} WHERE id = ?`, [id]);
+        const updatedRow = rows[0];
+        
+        // Broadcast changes
+        req.io.to('admin').emit(`${tableName.replace(/s$/, '')}-updated`, updatedRow);
+        if (tableName === 'orders') {
+          if (updatedRow.tableId) req.io.to(`table-${updatedRow.tableId}`).emit('order-updated', updatedRow);
+          if (updatedRow.customer_id) req.io.to(`customer-${updatedRow.customer_id}`).emit('order-updated', updatedRow);
+        }
+        
+        res.json(updatedRow);
+      } catch (err) {
+        console.error(`Error updating ${tableName}:`, err);
+        res.status(500).json({ error: 'Database error' });
+      }
+    });
+
+    // DELETE
+    app.delete(`/api/${tableName}/:id`, async (req: any, res) => {
+      try {
+        const db = await getDb();
+        const { id } = req.params;
+        
+        await db.execute(`DELETE FROM ${tableName} WHERE id = ?`, [id]);
+        
+        // Broadcast changes
+        req.io.to('admin').emit(`${tableName.replace(/s$/, '')}-deleted`, { id });
+        
+        res.json({ success: true });
+      } catch (err) {
+        console.error(`Error deleting ${tableName}:`, err);
+        res.status(500).json({ error: 'Database error' });
+      }
+    });
   });
 
+  // Specific overrides or additional logic
   app.post('/api/tables/login', async (req, res) => {
     const { tableId, code } = req.body;
     try {
@@ -141,118 +234,16 @@ async function startServer() {
     }
   });
 
-  // Products & Categories
-  app.get('/api/categories', async (req, res) => {
+  // RPC Mock for exec_sql
+  app.post('/api/rpc/exec_sql', async (req, res) => {
+    const { sql } = req.body;
     try {
       const db = await getDb();
-      const [categories] = await db.query('SELECT * FROM categories ORDER BY name');
-      res.json(categories);
+      await db.query(sql);
+      res.json({ success: true });
     } catch (err) {
-      res.status(500).json({ error: 'Database error' });
-    }
-  });
-
-  app.get('/api/products', async (req, res) => {
-    try {
-      const db = await getDb();
-      const [products]: any = await db.query(`
-        SELECT p.*, c.name as categoryName 
-        FROM products p 
-        LEFT JOIN categories c ON p.categoryId = c.id 
-        ORDER BY p.name
-      `);
-      
-      // Fetch ingredients for composed products
-      for (let p of products) {
-        if (p.type === 'composed') {
-          const [ingredients] = await db.query(`
-            SELECT pi.*, i.name as inventoryName, i.currentStock 
-            FROM product_ingredients pi
-            JOIN inventory_items i ON pi.inventoryItemId = i.id
-            WHERE pi.productId = ?
-          `, [p.id]);
-          p.ingredients = ingredients;
-        } else {
-          const [inventory_items]: any = await db.query('SELECT * FROM inventory_items WHERE id = ?', [p.id]);
-          p.inventory_item = inventory_items[0] || null;
-        }
-      }
-      
-      res.json(products);
-    } catch (err) {
-      res.status(500).json({ error: 'Database error' });
-    }
-  });
-
-  // Orders
-  app.post('/api/orders', async (req: any, res) => {
-    const { tableId, customer_id, items, total, type, delivery_address, payment_method } = req.body;
-    const db = await getDb();
-    
-    try {
-      await db.query('START TRANSACTION');
-      
-      const [orderResult]: any = await db.execute(
-        'INSERT INTO orders (tableId, customer_id, total, type, delivery_address, payment_method) VALUES (?, ?, ?, ?, ?, ?)',
-        [tableId || null, customer_id || null, total, type, delivery_address, payment_method]
-      );
-      
-      const orderId = orderResult.insertId;
-      
-      for (const item of items) {
-        await db.execute(
-          'INSERT INTO order_items (orderId, productId, quantity, notes) VALUES (?, ?, ?, ?)',
-          [orderId, item.id, item.quantity, item.notes || '']
-        );
-      }
-      
-      if (type === 'table' && tableId) {
-        await db.execute('UPDATE tables SET status = ? WHERE id = ?', ['ocupada', tableId]);
-      }
-      
-      await db.query('COMMIT');
-      
-      const [newOrders]: any = await db.query('SELECT * FROM orders WHERE id = ?', [orderId]);
-      const newOrder = newOrders[0];
-      
-      // Notify via Socket.io
-      req.io.to('admin').emit('new-order', newOrder);
-      if (tableId) req.io.to('admin').emit('table-updated', { id: tableId, status: 'ocupada' });
-      
-      res.json(newOrder);
-    } catch (e) {
-      await db.query('ROLLBACK');
-      res.status(500).json({ error: 'Failed to create order' });
-    }
-  });
-
-  app.get('/api/orders', async (req, res) => {
-    try {
-      const db = await getDb();
-      const [orders] = await db.query('SELECT * FROM orders ORDER BY created_at DESC');
-      res.json(orders);
-    } catch (err) {
-      res.status(500).json({ error: 'Database error' });
-    }
-  });
-
-  app.patch('/api/orders/:id/status', async (req: any, res) => {
-    const { status } = req.body;
-    const { id } = req.params;
-    
-    try {
-      const db = await getDb();
-      await db.execute('UPDATE orders SET status = ? WHERE id = ?', [status, id]);
-      const [orders]: any = await db.query('SELECT * FROM orders WHERE id = ?', [id]);
-      const order = orders[0];
-      
-      req.io.to('admin').emit('order-updated', order);
-      if (order.tableId) req.io.to(`table-${order.tableId}`).emit('order-updated', order);
-      if (order.customer_id) req.io.to(`customer-${order.customer_id}`).emit('order-updated', order);
-      
-      res.json(order);
-    } catch (err) {
-      res.status(500).json({ error: 'Database error' });
+      console.error('RPC exec_sql error:', err);
+      res.status(500).json({ error: 'Failed to execute SQL' });
     }
   });
 

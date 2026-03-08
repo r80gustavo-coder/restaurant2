@@ -62,6 +62,8 @@ export async function initDb() {
       categoryId INT,
       type VARCHAR(50) DEFAULT 'fixed',
       active BOOLEAN DEFAULT 1,
+      visible BOOLEAN DEFAULT 1,
+      inventoryItemId INT,
       FOREIGN KEY (categoryId) REFERENCES categories(id)
     );
   `);
@@ -72,6 +74,29 @@ export async function initDb() {
       number INT UNIQUE,
       status VARCHAR(50) DEFAULT 'livre',
       loginCode VARCHAR(50),
+      active BOOLEAN DEFAULT 1,
+      needs_waiter BOOLEAN DEFAULT 0
+    );
+  `);
+
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS drivers (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      name VARCHAR(255),
+      email VARCHAR(255) UNIQUE,
+      phone VARCHAR(50),
+      status VARCHAR(50) DEFAULT 'active',
+      vehicle VARCHAR(255)
+    );
+  `);
+
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS staff (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      name VARCHAR(255),
+      role VARCHAR(50),
+      email VARCHAR(255) UNIQUE,
+      phone VARCHAR(50),
       active BOOLEAN DEFAULT 1
     );
   `);
