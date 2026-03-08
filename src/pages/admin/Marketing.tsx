@@ -169,9 +169,9 @@ export default function Marketing() {
               <MessageSquare size={24} />
             </div>
             <div>
-              <h3 className="font-bold text-slate-800">Sugestões da IA</h3>
+              <h3 className="font-bold text-slate-800">Sugestões de Promoções</h3>
               <p className="text-sm text-slate-500">
-                {promotions.length > 0 ? `${promotions.length} mensagens prontas para envio` : 'Clique em Analisar para gerar mensagens'}
+                {promotions.length > 0 ? `${promotions.length} mensagens prontas para envio` : 'Clique em Gerar para criar mensagens'}
               </p>
             </div>
           </div>
@@ -181,7 +181,8 @@ export default function Marketing() {
               {promotions.map((promo, idx) => (
                 <div key={idx} className="p-4 bg-indigo-50/50 rounded-xl border border-indigo-100">
                   <div className="flex justify-between items-start mb-2">
-                    <p className="font-bold text-indigo-900">Para: {customers.find(c => c.id === promo.customerId)?.name || promo.phone}</p>
+                    <p className="font-bold text-indigo-900">Para: {promo.name}</p>
+                    <span className="text-xs font-bold text-indigo-600 bg-indigo-100 px-2 py-1 rounded-md">{promo.type}</span>
                   </div>
                   <p className="text-slate-700 whitespace-pre-wrap">{promo.message}</p>
                 </div>
@@ -190,7 +191,7 @@ export default function Marketing() {
           ) : (
             <div className="h-64 flex flex-col items-center justify-center text-slate-400">
               <Sparkles size={48} className="mb-4 opacity-20" />
-              <p>A IA analisará o histórico de compras e criará</p>
+              <p>O sistema analisará o histórico de compras e criará</p>
               <p>mensagens personalizadas para cada cliente.</p>
             </div>
           )}
