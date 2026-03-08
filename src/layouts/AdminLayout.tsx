@@ -176,6 +176,7 @@ export default function AdminLayout() {
     { path: '/admin/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
     { path: '/admin/orders', icon: ShoppingBag, label: 'Pedidos' },
     { path: '/admin/checkout', icon: DollarSign, label: 'Caixa' },
+    { path: '/admin/chat', icon: MessageSquare, label: 'Mensagens' },
     { path: '/admin/products', icon: Package, label: 'Produtos' },
     { path: '/admin/categories', icon: Tag, label: 'Categorias' },
     { path: '/admin/customers', icon: Users, label: 'Clientes' },

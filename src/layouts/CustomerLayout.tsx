@@ -6,6 +6,7 @@ import { supabase } from '../lib/supabase';
 import { motion, AnimatePresence } from 'framer-motion';
 
 const MotionDiv = motion.div as any;
+import CustomerChat from '../components/CustomerChat';
 
 export default function CustomerLayout() {
   const location = useLocation();
@@ -215,6 +216,8 @@ export default function CustomerLayout() {
       <main className="flex-1 overflow-auto">
         <Outlet />
       </main>
+
+      <CustomerChat />
 
       {/* Call Waiter Floating Button - Only for Table Orders */}
       {sessionStorage.getItem('orderType') === 'table' && (
