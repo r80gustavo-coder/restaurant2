@@ -1,23 +1,17 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { themeConfig } from '../../config/theme';
-import { Trash2, ShoppingBag, ArrowRight, CreditCard, Banknote, Smartphone } from 'lucide-react';
+import { Trash2, ShoppingBag, ArrowRight } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
-import axios from 'axios';
 
 export default function Cart() {
   const navigate = useNavigate();
   const [cart, setCart] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
-  const [paymentMethod, setPaymentMethod] = useState('credit_card'); // credit_card, cash, pix
-  const [showCardForm, setShowCardForm] = useState(false);
-  const [cardData, setCardData] = useState({ number: '', name: '', expiry: '', cvv: '' });
-  const orderType = sessionStorage.getItem('orderType') || 'table';
 
   useEffect(() => {
     const tableId = sessionStorage.getItem('tableId');
-    const customerId = sessionStorage.getItem('customerId');
-    if (!orderType && !tableId && !customerId) {
+    if (!tableId) {
       navigate('/login');
       return;
     }
@@ -35,47 +29,25 @@ export default function Cart() {
 
   const placeOrder = async () => {
     if (cart.length === 0) return;
-    
-    if (orderType === 'online' && paymentMethod === 'credit_card' && !showCardForm) {
-      setShowCardForm(true);
-      return;
-    }
-
-    if (showCardForm && (!cardData.number || !cardData.name || !cardData.expiry || !cardData.cvv)) {
-      alert('Por favor, preencha todos os dados do cartão.');
-      return;
-    }
-
     setLoading(true);
 
     const tableId = sessionStorage.getItem('tableId');
-    const customerId = sessionStorage.getItem('customerId');
-    const address = sessionStorage.getItem('customerAddress');
     
     try {
-      const orderData: any = {
-        status: 'pending',
-        paymentStatus: 'pending',
-        total: total,
-        type: orderType
-      };
-
-      if (orderType === 'table' && tableId) {
-        orderData.tableId = parseInt(tableId);
-      } else if (orderType === 'online' && customerId) {
-        orderData.customer_id = parseInt(customerId);
-        orderData.delivery_address = { full: address };
-        orderData.payment_method = paymentMethod;
-      }
-
       // 1. Criar o pedido na tabela 'orders'
       const { data: order, error: orderError } = await supabase
         .from('orders')
-        .insert([orderData])
+        .insert([{
+          tableId: parseInt(tableId!),
+          status: 'pending',
+          paymentStatus: 'pending',
+          total: total
+        }])
         .select()
         .single();
 
       if (orderError) throw orderError;
+
       if (!order) throw new Error('Erro ao criar pedido');
 
       // 2. Inserir os itens na tabela 'order_items'
@@ -92,33 +64,13 @@ export default function Cart() {
 
       if (itemsError) throw itemsError;
 
-      // 3. Atualizar status da mesa para ocupada (se for mesa)
-      if (orderType === 'table' && tableId) {
-        await supabase
-          .from('tables')
-          .update({ status: 'ocupada' })
-          .eq('id', parseInt(tableId));
-      }
+      // 3. Atualizar status da mesa para ocupada
+      await supabase
+        .from('tables')
+        .update({ status: 'ocupada' })
+        .eq('id', parseInt(tableId!));
 
-      // 4. Handle Credit Card Payment
-      if (orderType === 'online' && paymentMethod === 'credit_card') {
-        // Simulate payment processing
-        await new Promise(resolve => setTimeout(resolve, 1500));
-        await supabase.from('orders').update({ paymentStatus: 'paid' }).eq('id', order.id);
-        
-        sessionStorage.removeItem('cart');
-        setCart([]);
-        navigate('/status');
-        return;
-      }
-
-      if (orderType === 'online' && paymentMethod === 'pix') {
-        sessionStorage.removeItem('cart');
-        navigate(`/pix-payment/${order.id}`);
-        return;
-      }
-
-      // 5. Limpar carrinho e redirecionar
+      // 4. Limpar carrinho e redirecionar
       sessionStorage.removeItem('cart');
       setCart([]);
       navigate('/status');
@@ -185,37 +137,7 @@ export default function Cart() {
         ))}
       </div>
 
-      <div className="fixed bottom-[72px] left-0 w-full bg-white border-t border-slate-100 p-4 shadow-[0_-10px_40px_-15px_rgba(0,0,0,0.1)] z-40 max-h-[50vh] overflow-y-auto">
-        {orderType === 'online' && (
-          <div className="mb-4">
-            <h4 className={`text-sm font-bold text-${themeConfig.colors.text} mb-2 px-2`}>Forma de Pagamento</h4>
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                onClick={() => { setPaymentMethod('credit_card'); setShowCardForm(false); }}
-                className={`flex flex-col items-center justify-center p-3 rounded-xl border-2 transition-all ${
-                  paymentMethod === 'credit_card' 
-                    ? `border-${themeConfig.colors.primary} bg-${themeConfig.colors.primary}/5 text-${themeConfig.colors.primary}` 
-                    : 'border-slate-100 bg-slate-50 text-slate-500 hover:bg-slate-100'
-                }`}
-              >
-                <CreditCard size={24} className="mb-1" />
-                <span className="text-xs font-bold">Cartão</span>
-              </button>
-              <button
-                onClick={() => { setPaymentMethod('pix'); setShowCardForm(false); }}
-                className={`flex flex-col items-center justify-center p-3 rounded-xl border-2 transition-all ${
-                  paymentMethod === 'pix' 
-                    ? `border-${themeConfig.colors.primary} bg-${themeConfig.colors.primary}/5 text-${themeConfig.colors.primary}` 
-                    : 'border-slate-100 bg-slate-50 text-slate-500 hover:bg-slate-100'
-                }`}
-              >
-                <Smartphone size={24} className="mb-1" />
-                <span className="text-xs font-bold">Pix</span>
-              </button>
-            </div>
-          </div>
-        )}
-
+      <div className="fixed bottom-[72px] left-0 w-full bg-white border-t border-slate-100 p-4 shadow-[0_-10px_40px_-15px_rgba(0,0,0,0.1)] z-40">
         <div className="flex justify-between items-center mb-4 px-2">
           <span className={`text-lg font-bold text-${themeConfig.colors.textMuted}`}>Total</span>
           <span className={`text-3xl font-black text-${themeConfig.colors.text}`}>
@@ -223,48 +145,12 @@ export default function Cart() {
           </span>
         </div>
         
-        {showCardForm && paymentMethod === 'credit_card' && (
-          <div className="mb-4 space-y-3 bg-slate-50 p-4 rounded-2xl border border-slate-200">
-            <h4 className="font-bold text-slate-700 mb-2">Dados do Cartão</h4>
-            <input 
-              type="text" 
-              placeholder="Número do Cartão" 
-              value={cardData.number}
-              onChange={e => setCardData({...cardData, number: e.target.value})}
-              className="w-full p-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none"
-            />
-            <input 
-              type="text" 
-              placeholder="Nome impresso no cartão" 
-              value={cardData.name}
-              onChange={e => setCardData({...cardData, name: e.target.value})}
-              className="w-full p-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none"
-            />
-            <div className="flex gap-3">
-              <input 
-                type="text" 
-                placeholder="Validade (MM/AA)" 
-                value={cardData.expiry}
-                onChange={e => setCardData({...cardData, expiry: e.target.value})}
-                className="w-1/2 p-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none"
-              />
-              <input 
-                type="text" 
-                placeholder="CVV" 
-                value={cardData.cvv}
-                onChange={e => setCardData({...cardData, cvv: e.target.value})}
-                className="w-1/2 p-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none"
-              />
-            </div>
-          </div>
-        )}
-
         <button 
           onClick={placeOrder}
           disabled={loading}
           className={`w-full py-4 bg-${themeConfig.colors.primary} text-white font-black text-lg rounded-2xl flex items-center justify-center gap-3 shadow-lg shadow-${themeConfig.colors.primary}/30 disabled:opacity-50 disabled:cursor-not-allowed active:scale-[0.98] transition-all group`}
         >
-          {loading ? 'Processando...' : (showCardForm ? 'Pagar e Confirmar' : 'Confirmar Pedido')}
+          {loading ? 'Enviando...' : 'Confirmar Pedido'}
           {!loading && <ArrowRight size={22} className="group-hover:translate-x-1 transition-transform" />}
         </button>
       </div>

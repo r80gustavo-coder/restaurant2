@@ -1,5 +1,5 @@
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, ShoppingBag, Package, Users, LogOut, Bell, Tag, Box, DollarSign, FileText, CheckCircle, AlertCircle, Clock, MessageSquare, Volume2, VolumeX, Bike } from 'lucide-react';
+import { LayoutDashboard, ShoppingBag, Package, Users, LogOut, Bell, Tag, Box, DollarSign, FileText, CheckCircle, AlertCircle, Clock, MessageSquare, Volume2, VolumeX } from 'lucide-react';
 import { themeConfig } from '../config/theme';
 import { useEffect, useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -92,7 +92,7 @@ export default function AdminLayout() {
                 type = 'success';
               }
             } else if (payload.eventType === 'UPDATE') {
-              const oldStatus = (payload.old as any)?.status || prevStatus;
+              const oldStatus = payload.old?.status || prevStatus;
               console.log('Order Update:', { id: order.id, new: order.status, old: oldStatus });
               // Only notify if status changed
               if (order.status && order.status !== oldStatus && order.status !== 'chat_read' && order.status !== 'chat_unread') {
@@ -140,7 +140,7 @@ export default function AdminLayout() {
         (payload) => {
           console.log('🔔 TABLE EVENT RECEIVED:', payload);
           const newTable = payload.new as any;
-          const prevNeeds = (payload.old as any)?.needs_waiter ?? tableNeedsWaiterRef.current[newTable.id];
+          const prevNeeds = payload.old?.needs_waiter ?? tableNeedsWaiterRef.current[newTable.id];
           
           if (newTable.needs_waiter && !prevNeeds) {
             const newNotification = {
@@ -184,7 +184,6 @@ export default function AdminLayout() {
     { path: '/admin/tables', icon: Users, label: 'Mesas' },
     { path: '/admin/reports', icon: FileText, label: 'Relatórios' },
     { path: '/admin/staff', icon: Users, label: 'Equipe' },
-    { path: '/admin/drivers', icon: Bike, label: 'Motoristas' },
   ];
 
   const unreadCount = notifications.filter(n => !n.read).length;

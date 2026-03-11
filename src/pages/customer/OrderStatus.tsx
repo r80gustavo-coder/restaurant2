@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { themeConfig } from '../../config/theme';
-import { Clock, ChefHat, CheckCircle2, PackageCheck, Bike } from 'lucide-react';
+import { Clock, ChefHat, CheckCircle2, PackageCheck } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 
 export default function OrderStatus() {
@@ -9,24 +9,17 @@ export default function OrderStatus() {
   const [orders, setOrders] = useState<any[]>([]);
 
   const fetchOrders = async () => {
-    const orderType = sessionStorage.getItem('orderType');
     const tableId = sessionStorage.getItem('tableId');
-    const customerId = sessionStorage.getItem('customerId');
-
-    if (!orderType && !tableId && !customerId) {
+    if (!tableId) {
       navigate('/login');
       return;
     }
 
     try {
-      let query = supabase
+      const { data, error } = await supabase
         .from('orders')
         .select(`
           *,
-          drivers (
-            name,
-            phone
-          ),
           items:order_items (
             id,
             quantity,
@@ -37,30 +30,22 @@ export default function OrderStatus() {
             )
           )
         `)
+        .eq('tableId', parseInt(tableId))
         .neq('paymentStatus', 'paid') // Filter out paid orders (previous sessions)
         .neq('status', 'chat_unread')
         .neq('status', 'chat_read')
         .order('createdAt', { ascending: false });
-
-      if (orderType === 'table' && tableId) {
-        query = query.eq('tableId', parseInt(tableId));
-      } else if (orderType === 'online' && customerId) {
-        query = query.eq('customer_id', parseInt(customerId));
-      }
-
-      const { data, error } = await query;
 
       if (error) throw error;
 
       // Transformar os dados para o formato esperado pela UI
       const formattedOrders = data?.map(order => ({
         ...order,
-        driver: order.drivers,
-        items: order.items?.map((item: any) => ({
+        items: order.items.map((item: any) => ({
           ...item,
           name: item.product?.name,
           price: item.product?.price
-        })) || []
+        }))
       }));
 
       setOrders(formattedOrders || []);
@@ -72,18 +57,8 @@ export default function OrderStatus() {
   useEffect(() => {
     fetchOrders();
 
-    const orderType = sessionStorage.getItem('orderType');
     const tableId = sessionStorage.getItem('tableId');
-    const customerId = sessionStorage.getItem('customerId');
-
-    let filter = '';
-    if (orderType === 'table' && tableId) {
-      filter = `tableId=eq.${tableId}`;
-    } else if (orderType === 'online' && customerId) {
-      filter = `customer_id=eq.${parseInt(customerId)}`;
-    }
-
-    if (!filter) return;
+    if (!tableId) return;
 
     // Realtime subscription for orders
     const channel = supabase
@@ -94,7 +69,7 @@ export default function OrderStatus() {
           event: '*', 
           schema: 'public', 
           table: 'orders',
-          filter: filter
+          filter: `tableId=eq.${tableId}`
         },
         (payload) => {
           console.log('Order update:', payload);
@@ -113,7 +88,6 @@ export default function OrderStatus() {
       case 'pending': return <Clock size={24} className="text-orange-500" />;
       case 'preparing': return <ChefHat size={24} className="text-blue-500" />;
       case 'ready': return <CheckCircle2 size={24} className="text-emerald-500" />;
-      case 'out_for_delivery': return <Bike size={24} className="text-blue-500" />;
       case 'delivered': return <PackageCheck size={24} className="text-slate-500" />;
       default: return <Clock size={24} className="text-slate-500" />;
     }
@@ -124,7 +98,6 @@ export default function OrderStatus() {
       case 'pending': return 'Aguardando Preparo';
       case 'preparing': return 'Na Cozinha';
       case 'ready': return 'Pronto para Entrega';
-      case 'out_for_delivery': return 'Em Rota de Entrega';
       case 'delivered': return 'Entregue';
       case 'cancelled': return 'Cancelado';
       default: return status;
@@ -136,7 +109,6 @@ export default function OrderStatus() {
       case 'pending': return 'bg-orange-50 border-orange-200';
       case 'preparing': return 'bg-blue-50 border-blue-200';
       case 'ready': return 'bg-emerald-50 border-emerald-200';
-      case 'out_for_delivery': return 'bg-blue-50 border-blue-200';
       case 'delivered': return 'bg-slate-50 border-slate-200';
       case 'cancelled': return 'bg-red-50 border-red-200';
       default: return 'bg-slate-50 border-slate-200';
@@ -191,17 +163,6 @@ export default function OrderStatus() {
             </div>
             
             <div className="p-6 bg-slate-50/50">
-              {order.type === 'online' && order.driver && (
-                <div className="mb-6 p-4 bg-white rounded-2xl border border-slate-100 shadow-sm">
-                  <h4 className={`text-xs font-bold text-slate-400 uppercase tracking-widest mb-2`}>Entregador</h4>
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className={`font-bold text-${themeConfig.colors.text}`}>{order.driver.name}</p>
-                      <p className={`text-sm text-${themeConfig.colors.textMuted}`}>{order.driver.phone}</p>
-                    </div>
-                  </div>
-                </div>
-              )}
               <h4 className={`text-xs font-bold text-slate-400 uppercase tracking-widest mb-4`}>Itens do Pedido</h4>
               <div className="space-y-3">
                 {order.items?.map((item: any) => (

@@ -17,15 +17,6 @@ export default function Orders() {
           table:tables (
             number
           ),
-          customers (
-            name,
-            phone,
-            address
-          ),
-          drivers (
-            name,
-            phone
-          ),
           items:order_items (
             id,
             quantity,
@@ -40,25 +31,17 @@ export default function Orders() {
         .neq('status', 'chat_read')
         .order('createdAt', { ascending: false });
 
-      if (error) {
-        console.error('Supabase error fetching orders:', error);
-        throw error;
-      }
+      if (error) throw error;
 
       // Transformar os dados para o formato esperado pela UI
       const formattedOrders = data?.map(order => ({
         ...order,
         tableNumber: order.table?.number,
-        customerName: order.customers?.name,
-        customerPhone: order.customers?.phone,
-        driverName: order.drivers?.name,
-        driverPhone: order.drivers?.phone,
-        deliveryAddress: order.delivery_address?.full || order.customers?.address?.full,
-        items: order.items?.map((item: any) => ({
+        items: order.items.map((item: any) => ({
           ...item,
           name: item.product?.name,
           price: item.product?.price
-        })) || []
+        }))
       }));
 
       setOrders(formattedOrders || []);
@@ -158,7 +141,6 @@ export default function Orders() {
       case 'pending': return 'bg-orange-100 text-orange-700 border-orange-200';
       case 'preparing': return 'bg-blue-100 text-blue-700 border-blue-200';
       case 'ready': return 'bg-emerald-100 text-emerald-700 border-emerald-200';
-      case 'out_for_delivery': return 'bg-blue-100 text-blue-700 border-blue-200';
       case 'delivered': return 'bg-slate-100 text-slate-700 border-slate-200';
       case 'cancelled': return 'bg-red-100 text-red-700 border-red-200';
       default: return 'bg-slate-100 text-slate-700 border-slate-200';
@@ -170,7 +152,6 @@ export default function Orders() {
       case 'pending': return 'Pendente';
       case 'preparing': return 'Preparando';
       case 'ready': return 'Pronto';
-      case 'out_for_delivery': return 'Em Rota';
       case 'delivered': return 'Entregue';
       case 'cancelled': return 'Cancelado';
       default: return status;
@@ -184,8 +165,6 @@ export default function Orders() {
         <div className="flex gap-2">
           <span className="px-3 py-1 rounded-full bg-orange-100 text-orange-700 text-sm font-medium">Pendentes ({orders.filter(o => o.status === 'pending').length})</span>
           <span className="px-3 py-1 rounded-full bg-blue-100 text-blue-700 text-sm font-medium">Preparando ({orders.filter(o => o.status === 'preparing').length})</span>
-          <span className="px-3 py-1 rounded-full bg-emerald-100 text-emerald-700 text-sm font-medium">Prontos ({orders.filter(o => o.status === 'ready').length})</span>
-          <span className="px-3 py-1 rounded-full bg-blue-100 text-blue-700 text-sm font-medium">Em Rota ({orders.filter(o => o.status === 'out_for_delivery').length})</span>
         </div>
       </div>
 
@@ -197,17 +176,10 @@ export default function Orders() {
               onClick={() => setExpandedOrderId(expandedOrderId === order.id ? null : order.id)}
             >
               <div className="flex items-center gap-6">
-                {order.type === 'online' ? (
-                  <div className={`w-16 h-16 rounded-2xl bg-purple-100 flex flex-col items-center justify-center text-purple-600`}>
-                    <ShoppingBag size={24} className="mb-1" />
-                    <span className="text-[10px] font-bold uppercase tracking-wider">Online</span>
-                  </div>
-                ) : (
-                  <div className={`w-16 h-16 rounded-2xl bg-${themeConfig.colors.primary}/10 flex flex-col items-center justify-center text-${themeConfig.colors.primary}`}>
-                    <span className="text-xs font-semibold uppercase tracking-wider">Mesa</span>
-                    <span className="text-2xl font-bold">{order.tableNumber}</span>
-                  </div>
-                )}
+                <div className={`w-16 h-16 rounded-2xl bg-${themeConfig.colors.primary}/10 flex flex-col items-center justify-center text-${themeConfig.colors.primary}`}>
+                  <span className="text-xs font-semibold uppercase tracking-wider">Mesa</span>
+                  <span className="text-2xl font-bold">{order.tableNumber}</span>
+                </div>
                 
                 <div>
                   <div className="flex items-center gap-3 mb-1">
@@ -215,18 +187,10 @@ export default function Orders() {
                     <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider border ${getStatusColor(order.status)}`}>
                       {getStatusLabel(order.status)}
                     </span>
-                    {order.type === 'online' && (
-                      <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider border ${
-                        order.payment_status === 'paid' ? 'bg-emerald-100 text-emerald-700 border-emerald-200' : 'bg-orange-100 text-orange-700 border-orange-200'
-                      }`}>
-                        {order.payment_method?.toUpperCase()} - {order.payment_status === 'paid' ? 'PAGO' : 'PENDENTE'}
-                      </span>
-                    )}
                   </div>
                   <p className={`text-sm text-${themeConfig.colors.textMuted} flex items-center gap-2`}>
                     <Clock size={14} />
                     {new Date(order.createdAt).toLocaleString()}
-                    {order.type === 'online' && ` • ${order.customerName} (${order.customerPhone})`}
                   </p>
                 </div>
               </div>
@@ -256,7 +220,7 @@ export default function Orders() {
                       <Check size={18} /> Pronto
                     </button>
                   )}
-                  {(order.status === 'ready' || order.status === 'out_for_delivery') && (
+                  {order.status === 'ready' && (
                     <button 
                       onClick={() => updateStatus(order.id, 'delivered')}
                       className="flex items-center gap-2 px-4 py-2 bg-slate-800 text-white rounded-xl hover:bg-slate-900 transition-colors font-medium"
@@ -282,20 +246,6 @@ export default function Orders() {
 
             {expandedOrderId === order.id && (
               <div className="px-6 pb-6 pt-2 border-t border-slate-100 bg-slate-50/50">
-                {order.type === 'online' && (
-                  <div className="mb-6 p-4 bg-white rounded-xl border border-slate-200">
-                    <h4 className="font-bold text-slate-800 mb-2">Detalhes da Entrega</h4>
-                    <p className="text-sm text-slate-600"><strong>Cliente:</strong> {order.customerName}</p>
-                    <p className="text-sm text-slate-600"><strong>Telefone:</strong> {order.customerPhone}</p>
-                    <p className="text-sm text-slate-600"><strong>Endereço:</strong> {order.deliveryAddress}</p>
-                    {order.driverName && (
-                      <div className="mt-3 pt-3 border-t border-slate-100">
-                        <p className="text-sm text-slate-600"><strong>Entregador:</strong> {order.driverName}</p>
-                        <p className="text-sm text-slate-600"><strong>Contato:</strong> {order.driverPhone}</p>
-                      </div>
-                    )}
-                  </div>
-                )}
                 <h4 className={`font-semibold text-${themeConfig.colors.text} mb-4`}>Itens do Pedido</h4>
                 <div className="space-y-3">
                   {order.items?.map((item: any) => {

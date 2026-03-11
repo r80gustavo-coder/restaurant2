@@ -4,8 +4,6 @@ import { themeConfig } from '../config/theme';
 import { useEffect, useState, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import { motion, AnimatePresence } from 'framer-motion';
-
-const MotionDiv = motion.div as any;
 import CustomerChat from '../components/CustomerChat';
 
 export default function CustomerLayout() {
@@ -22,111 +20,65 @@ export default function CustomerLayout() {
   }, [soundEnabled]);
 
   useEffect(() => {
-    const orderType = sessionStorage.getItem('orderType');
     const tableId = sessionStorage.getItem('tableId');
-    const customerId = sessionStorage.getItem('customerId');
-
-    if (!orderType && !tableId && !customerId) {
+    if (!tableId) {
       navigate('/login');
       return;
     }
 
-    if (orderType === 'table' && tableId) {
-      // Monitor table status for auto-logout and order status changes
-      const channel = supabase
-        .channel(`customer-layout-${tableId}`)
-        .on(
-          'postgres_changes', 
-          { event: 'UPDATE', schema: 'public', table: 'tables', filter: `id=eq.${tableId}` }, 
-          (payload) => {
-            const newTable = payload.new as any;
-            if (newTable.status === 'livre') {
-              sessionStorage.removeItem('tableId');
-              sessionStorage.removeItem('tableNumber');
-              sessionStorage.removeItem('cart');
-              sessionStorage.removeItem('orderType');
-              navigate('/login');
-            }
+    // Monitor table status for auto-logout and order status changes
+    const channel = supabase
+      .channel(`customer-layout-${tableId}`)
+      .on(
+        'postgres_changes', 
+        { event: 'UPDATE', schema: 'public', table: 'tables', filter: `id=eq.${tableId}` }, 
+        (payload) => {
+          const newTable = payload.new as any;
+          if (newTable.status === 'livre') {
+            sessionStorage.removeItem('tableId');
+            sessionStorage.removeItem('tableNumber');
+            sessionStorage.removeItem('cart');
+            navigate('/login');
           }
-        )
-        .on(
-          'postgres_changes',
-          { event: 'UPDATE', schema: 'public', table: 'orders', filter: `tableId=eq.${tableId}` },
-          (payload) => {
-            const newOrder = payload.new as any;
-            const oldOrder = payload.old as any;
-            
-            if (newOrder.status && oldOrder.status && newOrder.status !== oldOrder.status) {
-              if (['preparing', 'ready', 'delivered'].includes(newOrder.status)) {
-                const statusMap: Record<string, string> = {
-                  preparing: 'Preparando',
-                  ready: 'Pronto',
-                  delivered: 'Entregue'
-                };
-                
-                setNotification({
-                  title: 'Atualização do Pedido',
-                  message: `Seu pedido agora está: ${statusMap[newOrder.status]}`
-                });
-                
-                if (audioRef.current && soundEnabledRef.current) {
-                  audioRef.current.currentTime = 0;
-                  audioRef.current.play().catch(e => console.log('Audio blocked', e));
-                }
-                
-                setTimeout(() => {
-                  setNotification(null);
-                }, 5000);
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'orders', filter: `tableId=eq.${tableId}` },
+        (payload) => {
+          const newOrder = payload.new as any;
+          const oldOrder = payload.old as any;
+          
+          if (newOrder.status && oldOrder.status && newOrder.status !== oldOrder.status) {
+            if (['preparing', 'ready', 'delivered'].includes(newOrder.status)) {
+              const statusMap: Record<string, string> = {
+                preparing: 'Preparando',
+                ready: 'Pronto',
+                delivered: 'Entregue'
+              };
+              
+              setNotification({
+                title: 'Atualização do Pedido',
+                message: `Seu pedido agora está: ${statusMap[newOrder.status]}`
+              });
+              
+              if (audioRef.current && soundEnabledRef.current) {
+                audioRef.current.currentTime = 0;
+                audioRef.current.play().catch(e => console.log('Audio blocked', e));
               }
+              
+              setTimeout(() => {
+                setNotification(null);
+              }, 5000);
             }
           }
-        )
-        .subscribe();
+        }
+      )
+      .subscribe();
 
-      return () => {
-        supabase.removeChannel(channel);
-      };
-    } else if (orderType === 'online' && customerId) {
-       const channel = supabase
-        .channel(`customer-layout-online-${customerId}`)
-        .on(
-          'postgres_changes',
-          { event: 'UPDATE', schema: 'public', table: 'orders', filter: `customer_id=eq.${parseInt(customerId)}` },
-          (payload) => {
-            const newOrder = payload.new as any;
-            const oldOrder = payload.old as any;
-            
-            if (newOrder.status && oldOrder.status && newOrder.status !== oldOrder.status) {
-              if (['preparing', 'ready', 'delivered'].includes(newOrder.status)) {
-                const statusMap: Record<string, string> = {
-                  preparing: 'Preparando',
-                  ready: 'Pronto',
-                  delivered: 'Entregue'
-                };
-                
-                setNotification({
-                  title: 'Atualização do Pedido',
-                  message: `Seu pedido agora está: ${statusMap[newOrder.status]}`
-                });
-                
-                if (audioRef.current && soundEnabledRef.current) {
-                  audioRef.current.currentTime = 0;
-                  audioRef.current.play().catch(e => console.log('Audio blocked', e));
-                }
-                
-                setTimeout(() => {
-                  setNotification(null);
-                }, 5000);
-              }
-            }
-          }
-        )
-        .subscribe();
-
-      return () => {
-        supabase.removeChannel(channel);
-      };
-    }
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [navigate]);
 
   const navItems = [
@@ -137,8 +89,7 @@ export default function CustomerLayout() {
 
   const handleCallWaiter = async () => {
     const tableId = sessionStorage.getItem('tableId');
-    const orderType = sessionStorage.getItem('orderType');
-    if (!tableId || orderType !== 'table') return;
+    if (!tableId) return;
 
     setIsCallingWaiter(true);
     try {
@@ -190,9 +141,7 @@ export default function CustomerLayout() {
           <img src={themeConfig.logo} alt="Logo" className="w-10 h-10 rounded-full object-cover" referrerPolicy="no-referrer" />
           <div>
             <h1 className={`font-bold text-lg text-${themeConfig.colors.text}`}>{themeConfig.name}</h1>
-            <p className={`text-xs text-${themeConfig.colors.textMuted}`}>
-              {sessionStorage.getItem('orderType') === 'online' ? 'Delivery & Retirada' : `Mesa ${sessionStorage.getItem('tableNumber')}`}
-            </p>
+            <p className={`text-xs text-${themeConfig.colors.textMuted}`}>Faça seu pedido</p>
           </div>
         </div>
         <button
@@ -200,8 +149,6 @@ export default function CustomerLayout() {
             sessionStorage.removeItem('tableId');
             sessionStorage.removeItem('tableNumber');
             sessionStorage.removeItem('cart');
-            sessionStorage.removeItem('orderType');
-            sessionStorage.removeItem('customerId');
             navigate('/login');
           }}
           className="p-2 text-slate-400 hover:text-red-500 transition-colors flex items-center gap-1 text-sm font-medium"
@@ -219,26 +166,24 @@ export default function CustomerLayout() {
 
       <CustomerChat />
 
-      {/* Call Waiter Floating Button - Only for Table Orders */}
-      {sessionStorage.getItem('orderType') === 'table' && (
-        <button
-          onClick={handleCallWaiter}
-          disabled={isCallingWaiter}
-          className={`fixed bottom-40 right-6 z-40 w-14 h-14 rounded-full shadow-lg flex items-center justify-center transition-all ${
-            isCallingWaiter 
-              ? 'bg-slate-300 text-slate-500 scale-95' 
-              : 'bg-red-500 hover:bg-red-600 text-white hover:scale-105 hover:shadow-xl'
-          }`}
-          title="Chamar Garçom"
-        >
-          <BellRing size={24} className={isCallingWaiter ? '' : 'animate-pulse'} />
-        </button>
-      )}
+      {/* Call Waiter Floating Button */}
+      <button
+        onClick={handleCallWaiter}
+        disabled={isCallingWaiter}
+        className={`fixed bottom-40 right-6 z-40 w-14 h-14 rounded-full shadow-lg flex items-center justify-center transition-all ${
+          isCallingWaiter 
+            ? 'bg-slate-300 text-slate-500 scale-95' 
+            : 'bg-red-500 hover:bg-red-600 text-white hover:scale-105 hover:shadow-xl'
+        }`}
+        title="Chamar Garçom"
+      >
+        <BellRing size={24} className={isCallingWaiter ? '' : 'animate-pulse'} />
+      </button>
 
       {/* Notification Toast */}
       <AnimatePresence>
         {notification && (
-          <MotionDiv
+          <motion.div
             initial={{ opacity: 0, y: -50, x: '-50%' }}
             animate={{ opacity: 1, y: 0, x: '-50%' }}
             exit={{ opacity: 0, y: -50, x: '-50%' }}
@@ -251,7 +196,7 @@ export default function CustomerLayout() {
               <h4 className={`font-bold text-${themeConfig.colors.text} text-sm`}>{notification.title}</h4>
               <p className={`text-${themeConfig.colors.textMuted} text-xs mt-1`}>{notification.message}</p>
             </div>
-          </MotionDiv>
+          </motion.div>
         )}
       </AnimatePresence>
 

@@ -71,7 +71,7 @@ export default function Kitchen() {
         { event: '*', schema: 'public', table: 'orders' },
         (payload) => {
           const newOrder = payload.new as any;
-          const oldStatus = (payload.old as any)?.status || orderStatusesRef.current[newOrder.id];
+          const oldStatus = payload.old?.status || orderStatusesRef.current[newOrder.id];
           
           if (payload.eventType === 'INSERT' || (payload.eventType === 'UPDATE' && newOrder.status === 'pending' && oldStatus !== 'pending')) {
             if (audioRef.current && soundEnabledRef.current) {
